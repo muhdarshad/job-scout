@@ -13,12 +13,14 @@ logging.basicConfig(level=logging.INFO)
 def collect(include_ls):
     from src.webscraper.pipeline import run_pipeline
     from job_ranker_v2 import rank_dataframe
+    with Session() as s:
+        keywords = s.get(Setting, 'title_exclusions').data
     # Empty per-run history directory disables workbook-based duplicate removal.
     # Database source identity preserves records and user tracking across runs.
     with tempfile.TemporaryDirectory() as directory:
         csv = str(Path(directory) / 'jobs.csv')
         frame = run_pipeline(workers=int(os.getenv('SCRAPE_WORKERS', '4')),
-            include_ls=include_ls, output_path=csv, progress=False)
+            include_ls=include_ls, output_path=csv, progress=False, excluded_keywords=keywords)
         ranked = rank_dataframe(csv, directory)
         if not ranked.empty:
             ranked['matched_skills'] = ranked['matched_skills'].map(sorted)

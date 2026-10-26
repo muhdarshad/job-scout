@@ -115,3 +115,26 @@ git push -u origin main
 ```
 
 The `.gitignore` excludes `.env`, local databases, virtual environments, node_modules and build output. Keep PostgreSQL backups outside the repository.
+
+
+## Review filters, bulk actions and alerts
+
+- **Min experience reqd** now selects the employer's explicit minimum: “2 years minimum” matches numeric minimum 2; “5+ years minimum” groups 5 and above. This replaces the old “up to” ceiling. “Not stated / no numeric minimum” includes qualitative wording and cases without an extracted mandatory numeric bound; it never means zero experience.
+- Check individual jobs or **Select all shown**, choose a status and press **Assign status** (maximum 1,000 per batch). A stale edit or missing record rolls back the whole batch. Notes are untouched. Changing search, filters or page clears selection. Archived jobs can be selected individually.
+- **Title exclusions** accepts one literal keyword/phrase per line, no regular expressions. Defaults cover postal delivery, parcel sorting, warehouse operatives, forklift/delivery drivers, cleaning, cashier and kitchen-helper roles in German and English. Matching ignores case, normalizes umlauts/hyphens and permits common plural/gender endings. These are starter rules; remove terms that are relevant to your search.
+- Existing keyword matches are hidden by default, not deleted; **Show keyword-excluded jobs** reveals them. Remove a keyword to restore visibility. New matching listings are filtered before the later description-enrichment pass; adapters that fetch detail metadata during listing still make those requests. Existing hard-coded scraper/ranker filters remain in effect.
+- **Likely interested** badges and **Likely interested only** use the same title-keyword rules as the existing Excel ranker. This is a keyword signal, not an assessment of qualification or a score threshold. Exclusion matches take precedence.
+- **Not fit** is added automatically to existing databases without resetting statuses, notes or schedules. **Not interested** and **Not fit** share the collapsed archive and can be restored through the job dialog.
+- Cards/rows show **Added** and **Scraped** with dates and times. Details also show first scraped and last database refresh. Scrape time records when a source's listing batch was collected, not the employer's publication time. Database-added time remains stable across refreshes. Previously collected records have no recoverable exact scrape time and show “Not recorded” until a later collection records one. Times display in the device timezone; storage uses UTC.
+- Open **Result alerts** to opt into a beep and/or desktop notification. Permission is requested only from your click. Click **Enable / test sound** after reopening a tab to satisfy browser autoplay requirements. Keep Job Scout open: this is browser polling, not background OS push delivery. New completed/partial runs alert only when they add jobs; old runs, repeated polls and zero-new-job results do not alert. Web Locks serializes claims between tabs where supported; browsers without it use best-effort localStorage deduplication. Browser/OS notification settings, Do Not Disturb and sleeping/background tabs can delay or suppress delivery.
+
+After merging, update your checkout and rebuild without deleting the PostgreSQL volume:
+
+```bash
+git pull origin main
+docker compose up --build -d
+```
+
+No destructive database migration is required: this release uses existing JSON data and settings tables. A running scrape uses the exclusions captured at its start; new settings apply on the next scrape.
+
+Additional checks: `npm run test:unit` covers minimum-year buckets, archive categories and notification deduplication. Backend regressions cover bulk rollback, notes, existing-database upgrades, reversible title filtering and timestamp semantics. GitHub Actions runs those checks plus the scraper suite and frontend build.

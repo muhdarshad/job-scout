@@ -2,3 +2,26 @@
 @media(min-width:1500px){.content{padding:40px}.column{padding:24px 16px}.job-card{padding:22px 18px}.metadata{font-size:12px}.card-note{font-size:13px}}
 @media(max-width:1200px){aside{width:205px;min-width:205px}.wordmark{font-size:19px}main{margin-left:205px;width:calc(100% - 205px)}.page-heading{align-items:flex-start;flex-direction:column}.board{grid-auto-columns:290px}.date{font-size:11px}.heading-actions button{font-size:13px}.content{padding:25px 22px}}
 @media(max-width:700px){aside{position:static;width:100%;padding:18px;display:block}.shell{display:block}.submark,.sync{display:none}nav{display:flex;margin-top:18px;gap:10px}nav button{padding:9px;font-size:12px}.nav-count{display:none}main{margin:0;width:100%}header{padding:0 12px}.date{display:none}.content{padding:24px 16px}h1{font-size:29px}.heading-actions{flex-wrap:wrap}.filters{gap:12px}.company-filter{width:100%}.board{grid-auto-columns:290px;min-height:0}.discover-row{padding:16px;gap:12px;flex-wrap:wrap}.discover-row>div{min-width:70%}.requirements{grid-template-columns:1fr}.source-toolbar{flex-direction:column;align-items:flex-start}footer span:last-child{display:none}}
+
+/* Review controls keep the existing board layout. */
+.filter-options,.bulk-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:16px;margin:14px 0}
+.filter-options label,.bulk-toolbar label{display:flex;align-items:center;gap:8px;color:#505c76}
+.filter-options input,.bulk-toolbar input,.job-select{accent-color:#7043f5;width:17px;height:17px;cursor:pointer;flex-shrink:0}
+.filter-hint{font-size:12px;color:#69768d;line-height:1.6;margin:10px 0 16px}
+.experience-filter{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:600}
+.experience-filter select{font-size:14px;font-weight:400}
+.bulk-toolbar{padding:12px 16px;background:#efedf8;border-radius:8px;margin-bottom:22px}
+.bulk-toolbar>span{font-size:12px;color:#6e7790}
+.card-selection{display:flex;align-items:center;gap:8px;margin-bottom:12px;min-height:22px}
+.job-tags{display:flex;gap:7px;flex-wrap:wrap;margin:6px 0}
+.interest-badge,.exclusion-badge{font-size:10px;padding:4px 7px;border-radius:4px;font-weight:600}
+.interest-badge{color:#176a50;background:#e1f5ec}.exclusion-badge{color:#97581d;background:#fff0db}
+.job-card.likely-interest,.discover-row.likely-interest{border-left:3px solid #66b397;background:#fbfefc}
+.job-card .score{top:78px}.job-card .card-menu{top:48px}
+.job-times{display:flex;flex-wrap:wrap;gap:5px 14px;font-size:10px;color:#768197;line-height:1.6;margin-top:12px}
+.job-card .job-times{display:grid}.detail-times{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;font-size:12px;margin:20px 0}
+.detail-times dt{color:#6e7891}.detail-times dd{margin:0}
+.archive-row{display:flex;align-items:center;gap:12px;border-bottom:1px solid #e4e5ed;padding:6px}
+.archive-row>span{margin-left:auto;font-size:12px;color:#738099}.archive-row button{text-align:left}
+.alerts-button{align-self:center;min-height:32px;padding:5px 10px;margin-left:auto;margin-right:18px;font-size:12px}
+@media(max-width:700px){.bulk-toolbar{gap:10px}.bulk-toolbar select{max-width:180px}.archive-row{flex-wrap:wrap}.detail-times{grid-template-columns:1fr}.alerts-button{margin-right:0}.job-times{font-size:11px}}
