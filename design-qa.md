@@ -27,3 +27,12 @@ The preview service helper was unavailable in this workspace. A Vite dev server 
 3. Capture the Applications screen at the reference viewport, then compare source and implementation together.
 4. Check console errors, keyboard focus, dialog dismissal, responsive board scrolling and error states.
 5. Resolve visual findings before marking this report passed.
+
+
+## Review-tools update
+
+The existing code/design target is retained. Added labelled minimum-experience choices, native selection checkboxes, a bulk-action bar, likely-interest badges/filter, title-exclusion settings, a combined archive, timestamps and opt-in result alerts. No new visual direction was introduced.
+
+Current environment: workspace offline and cloud browser unavailable. No new rendered capture or browser interaction check was possible. Source review and automated checks cannot establish visual fidelity. Manual follow-up: verify narrow-screen bulk toolbar, checkbox focus/selection, archive restoration, modal errors, and actual OS notifications/audio after granting permissions.
+
+final result: blocked

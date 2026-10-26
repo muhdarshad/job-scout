@@ -1,6 +1,8 @@
 """Concurrent company portals plus a separately paced LS worker."""
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from datetime import datetime, timezone
+from job_rules import excluded_keyword
 
 import pandas as pd
 import yaml
@@ -13,15 +15,16 @@ from .jobspy_source import fetch_jobspy
 from .terminal import ScrapeDisplay
 
 
-def filter_titles_before_enrichment(df):
+def filter_titles_before_enrichment(df, excluded_keywords=()):
     if 'title' not in df:
         return df
     keep = ~df['title'].fillna('').astype(str).str.contains(EXCLUDED_TITLE_PATTERN, na=False)
+    keep &= ~df['title'].fillna('').map(lambda title: bool(excluded_keyword(title, excluded_keywords)))
     return df.loc[keep].reset_index(drop=True)
 
 
 def run_pipeline(max_results_per_site=None, enrich=True, extract_skills=True, output_path=None,
-                 config_path=None, workers=4, include_ls=False, ls_config_path=None, progress=True):
+                 config_path=None, workers=4, include_ls=False, ls_config_path=None, progress=True, excluded_keywords=()):
     if workers < 1 or max_results_per_site is not None and max_results_per_site < 1:
         raise ValueError('Workers and result limits must be positive')
     config = load_sites_config(config_path)
@@ -46,7 +49,8 @@ def run_pipeline(max_results_per_site=None, enrich=True, extract_skills=True, ou
                 rows = platform.fetch_jobs(site, max_results=limit)
                 df = pd.DataFrame(rows, columns=COLUMNS)
                 stat['found'] = len(df)
-                df = filter_titles_before_enrichment(df)
+                df['scraped_at'] = datetime.now(timezone.utc).isoformat()
+                df = filter_titles_before_enrichment(df, excluded_keywords)
                 stat['after_titles'] = len(df)
                 df['source'], df['source_site'] = 'CS', name
                 if enrich and not df.empty:
@@ -68,7 +72,8 @@ def run_pipeline(max_results_per_site=None, enrich=True, extract_skills=True, ou
             try:
                 raw, errors = fetch_jobspy(ls_config, enrich, lambda done, total, stage: display.update(task, stage, done, total))
                 raw['source_site'] = 'LS / ' + raw['source_site']
-                df = filter_titles_before_enrichment(raw)
+                raw['scraped_at'] = datetime.now(timezone.utc).isoformat()
+                df = filter_titles_before_enrichment(raw, excluded_keywords)
                 if extract_skills and not df.empty:
                     df = add_skills_column(df)
                 rows = [dict(source_site=name, found=int((raw.source_site == name).sum()),

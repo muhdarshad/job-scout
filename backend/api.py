@@ -4,7 +4,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select, update
 from .db import Job, Run, Setting, Session, init, serialize
 
@@ -39,7 +39,9 @@ def health():
 def state():
     with Session() as s:
         runs = s.scalars(select(Run).order_by(Run.id.desc()).limit(20)).all()
-        return {'jobs': [serialize(j) for j in s.scalars(select(Job))],
+        keywords = s.get(Setting, 'title_exclusions').data
+        return {'jobs': [serialize(j, keywords) for j in s.scalars(select(Job))],
+                'title_exclusions': keywords,
                 'statuses': s.get(Setting, 'statuses').data, 'schedule': s.get(Setting, 'schedule').data,
                 'requested': s.get(Setting, 'run_requested').data, 'demo': os.getenv('DEMO_MODE') == '1',
                 'runs': [{'id': r.id, 'started': r.started, 'finished': r.finished, 'status': r.status, 'details': r.details} for r in runs]}
@@ -60,6 +62,50 @@ def edit(key: str, body: JobEdit):
             raise HTTPException(409, 'Job changed in another window. Reload and retry.')
         return serialize(s.get(Job, key))
 
+class BulkJob(BaseModel):
+    key: str = Field(min_length=64, max_length=64)
+    version: int = Field(ge=1)
+
+class BulkStatusEdit(BaseModel):
+    jobs: list[BulkJob] = Field(min_length=1, max_length=1000)
+    status: str = Field(min_length=1, max_length=80)
+
+@app.post('/api/jobs/bulk-status')
+def bulk_status(body: BulkStatusEdit):
+    if len({job.key for job in body.jobs}) != len(body.jobs):
+        raise HTTPException(400, 'Duplicate job selection')
+    # One transaction: a stale/missing row rolls back the entire batch.
+    with Session.begin() as s:
+        if body.status not in s.get(Setting, 'statuses', with_for_update=True).data:
+            raise HTTPException(400, 'Unknown status')
+        for job in sorted(body.jobs, key=lambda item: item.key):
+            changed = s.execute(update(Job).where(Job.key == job.key, Job.version == job.version)
+                .values(status=body.status, version=Job.version + 1))
+            if not changed.rowcount:
+                raise HTTPException(409, 'Some selected jobs changed. Reload, reselect and retry; no jobs were updated.')
+    return {'updated': len(body.jobs)}
+
+class ExclusionsEdit(BaseModel):
+    keywords: list[str] = Field(max_length=200)
+
+    @field_validator('keywords')
+    @classmethod
+    def clean(cls, words):
+        cleaned = []
+        for word in words:
+            word = word.strip()
+            if not 2 <= len(word) <= 80:
+                raise ValueError('Each keyword must contain 2–80 characters.')
+            if word.casefold() not in {item.casefold() for item in cleaned}:
+                cleaned.append(word)
+        return cleaned
+
+@app.put('/api/title-exclusions')
+def title_exclusions(body: ExclusionsEdit):
+    with Session.begin() as s:
+        s.get(Setting, 'title_exclusions').data = body.keywords
+    return body
+
 class StatusEdit(BaseModel):
     old: str | None = None
     name: str = Field(min_length=1, max_length=80)
@@ -73,7 +119,7 @@ def statuses(body: StatusEdit):
         if not name or name in values or len(values) >= 20 and not body.old:
             raise HTTPException(400, 'Use a unique status name (maximum 20 statuses).')
         if body.old:
-            if body.old in ('New', 'Not interested') or body.old not in values:
+            if body.old in ('New', 'Not interested', 'Not fit') or body.old not in values:
                 raise HTTPException(400, 'This status cannot be renamed.')
             values[values.index(body.old)] = name
             s.execute(update(Job).where(Job.status == body.old).values(status=name, version=Job.version + 1))
@@ -107,11 +153,12 @@ def export():
     workbook = openpyxl.Workbook()
     sheet = workbook.active
     sheet.title = 'Jobs'
-    columns = ['title', 'company', 'location', 'total_score', 'experience_required', 'german_required', 'status', 'notes', 'job_url', 'first_seen', 'last_seen']
+    columns = ['title', 'company', 'location', 'total_score', 'experience_required', 'german_required', 'status', 'notes', 'job_url', 'first_seen', 'last_seen', 'scraped_at', 'first_scraped_at', 'likely_interested', 'excluded_keyword']
     sheet.append(columns)
     with Session() as s:
+        keywords = s.get(Setting, 'title_exclusions').data
         for job in s.scalars(select(Job)):
-            row = serialize(job)
+            row = serialize(job, keywords)
             values = [row.get(k, '') for k in columns]
             sheet.append(values)
             # Scraped text must never become an executable spreadsheet formula.

@@ -58,21 +58,7 @@ SKILL_PATTERNS = {
 
 
 # ---------- APPROVED TITLE KEYWORDS ----------
-NOT_INTERESTED_PATTERNS = [
-    r"technician", r"techniker", r"prüfstandtechniker", r"inbetriebnahmetechniker",
-    r"verkäufer", r"sales[\s-]+assistant", r"postdoc", r"post[\s-]+doc", r"postdoctoral", r"postdoktorand",
-    r"ausbildung", r"duales[\s-]+studium", r"neuroscience", r"neurology", r"neuroimaging", r"neuropeptide",
-    r"bioinformatics", r"immunity", r"clinical[\s-]+science", r"civil", r"bauingenieur", r"geotechnik", r"tragwerksplanung",
-    r"uae[\s-]+nationals?", r"emiratis", r"professor", r"backend", r"full[\s-]+stack",
-    r"react[\s-]+native", r"web[\s-]+development", r"marketing", r"business[\s-]+development",
-]
-INTERESTED_PATTERNS = [
-    r"digitalisierung", r"reporting", r"aerospace", r"quality[\s-]+manager", r"data[\s-]+scientist",
-    r"business[\s-]+intelligence", r"bi", r"data[\s-]+analyst", r"datenanalyst", r"analytics",
-    r"quality", r"qualitäts\w*", r"mechanical", r"graduate",
-]
-NOT_INTERESTED_REGEX = re.compile(r"\b(?:" + "|".join(NOT_INTERESTED_PATTERNS) + r")\b", re.IGNORECASE)
-INTERESTED_REGEX = re.compile(r"\b(?:" + "|".join(INTERESTED_PATTERNS) + r")\b", re.IGNORECASE)
+from job_rules import NOT_INTERESTED_PATTERNS, INTERESTED_PATTERNS, NOT_INTERESTED_REGEX, INTERESTED_REGEX
 
 def _series(df: pd.DataFrame, column: str) -> pd.Series:
     return df[column].fillna("").astype(str) if column in df else pd.Series("", index=df.index, dtype=str)
