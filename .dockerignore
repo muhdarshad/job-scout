@@ -1,0 +1,16 @@
+node_modules
+.venv
+.git
+.env
+*.db
+*.zip
+__pycache__
+.pytest_cache
+dist
+qa
+
+pip-*/
+tmp*/
+pytest-of-root/
+scraper/pytest-of-root/
+*.dump

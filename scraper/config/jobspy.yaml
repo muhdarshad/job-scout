@@ -1,0 +1,28 @@
+enabled: true
+sites:
+- indeed
+- linkedin
+location: Germany
+country_indeed: Germany
+hours_old: 8
+results_per_page: 20
+pages_per_term: 2
+pause_seconds:
+- 5
+- 12
+search_terms:
+- Power BI Analyst
+- Data Analyst
+- Business Intelligence
+- Quality Engineer
+- Aerospace Engineer
+- Aeronautical Engineer
+- Aerodynamics Engineer
+- CFD Simulation Engineer
+- Design Engineer Siemens NX
+- Graduate Engineer
+- Trainee Engineer
+- Flight data analyst
+- Flight test engineer
+- PhD
+

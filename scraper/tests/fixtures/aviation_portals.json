@@ -1,0 +1,196 @@
+{
+  "audi_job": {
+    "JobID": "8EE99640D9021FE1ABB9B1FFC03E4507",
+    "Title": "Production Engineer",
+    "DepartmentDesc": "",
+    "TaskDesc": "",
+    "ZPublicationDate": "/Date(1789516800000)/",
+    "FunctionalArea": {
+      "Text": "Logistics"
+    },
+    "ContractType": {
+      "Text": ""
+    },
+    "HierarchyLevel": {
+      "Text": "Internship"
+    },
+    "Location": {
+      "LocationID": 32760301,
+      "Text": "Neckarsulm"
+    }
+  },
+  "audi_locations": [
+    {
+      "LocationID": 0,
+      "Text": "Global",
+      "ParentLocationID": 0
+    },
+    {
+      "LocationID": 30000000,
+      "Text": "Europe",
+      "ParentLocationID": 0
+    },
+    {
+      "LocationID": 32760000,
+      "Text": "Germany",
+      "ParentLocationID": 30000000
+    },
+    {
+      "LocationID": 32760300,
+      "Text": "Baden-Wuerttemberg",
+      "ParentLocationID": 32760000
+    },
+    {
+      "LocationID": 32760301,
+      "Text": "Neckarsulm",
+      "ParentLocationID": 32760300
+    }
+  ],
+  "audi_detail": {
+    "JobID": "8EE99640D9021FE1ABB9B1FFC03E4507",
+    "Title": "Production Engineer",
+    "DepartmentDesc": "# Support digital production processes",
+    "TaskDesc": "",
+    "ZPublicationDate": null,
+    "FunctionalArea": {
+      "Text": "Logistics"
+    },
+    "ContractType": {
+      "Text": ""
+    },
+    "HierarchyLevel": {
+      "Text": "Internship"
+    },
+    "Location": {
+      "LocationID": 32760301,
+      "Text": "Neckarsulm"
+    }
+  },
+  "etihad": {
+    "id": "744000155738710",
+    "name": "Production Engineer",
+    "releasedDate": "2026-10-15T11:52:58.184Z",
+    "location": {
+      "city": "Abu Dhabi",
+      "country": "ae",
+      "remote": false,
+      "hybrid": false,
+      "fullLocation": "Abu Dhabi, , United Arab Emirates"
+    },
+    "function": {
+      "id": "other",
+      "label": "Other"
+    },
+    "typeOfEmployment": {
+      "id": "permanent",
+      "label": "Full-time"
+    }
+  },
+  "etihad_detail": {
+    "id": "744000155738710",
+    "name": "Production Engineer",
+    "location": {
+      "city": "Abu Dhabi",
+      "country": "ae",
+      "remote": false,
+      "hybrid": false,
+      "fullLocation": "Abu Dhabi, , United Arab Emirates"
+    },
+    "releasedDate": "2026-10-15T11:52:58.184Z",
+    "jobAd": {
+      "sections": {
+        "jobDescription": {
+          "text": "<p>Maintain the knowledge base.</p>"
+        }
+      }
+    },
+    "function": {
+      "id": "other",
+      "label": "Other"
+    },
+    "typeOfEmployment": {
+      "id": "permanent",
+      "label": "Full-time"
+    }
+  },
+  "emirates": {
+    "title": "Production Engineer",
+    "reqid": "267",
+    "country": "United Arab Emirates",
+    "state": "Dubai",
+    "city": "Dubai",
+    "postingdate": 1748390400000,
+    "jobdescription": "<p>Cabin crew duties and qualifications.</p>",
+    "categoryList": [
+      "Cabin Crew"
+    ]
+  },
+  "man": {
+    "division_obj": [
+      "TRATON R&D Germany GmbH"
+    ],
+    "supportedLocales": [
+      "de_DE"
+    ],
+    "filter1": [
+      "Forschung und Entwicklung"
+    ],
+    "unifiedUrlTitle": "Production-Engineer",
+    "unifiedStandardStart": "15.10.26",
+    "unifiedStandardTitle": "Production Engineer",
+    "id": "3628",
+    "filter6": [
+      "Berufserfahrene"
+    ],
+    "filter7": [
+      "München"
+    ],
+    "urlTitle": "Test-Engineer-eMobility-Powertrain-%28wmd%29"
+  },
+  "man_dubai": {
+    "division_obj": [
+      "MTB Middle East FZE"
+    ],
+    "supportedLocales": [
+      "en_US"
+    ],
+    "filter1": [
+      "Sales"
+    ],
+    "unifiedUrlTitle": "Production-Engineer",
+    "unifiedStandardStart": "11/12/25",
+    "id": "5080",
+    "unifiedStandardTitle": "Production Engineer",
+    "filter6": [
+      "Professional"
+    ],
+    "filter7": [
+      "München"
+    ],
+    "urlTitle": "Sales-Training-Manager-%28fmd%29-based-in-Dubai"
+  },
+  "liebherr_job": {
+    "city": {
+      "label": "Lindenberg im Allgäu"
+    },
+    "company": {
+      "name": "Liebherr-Aerospace Lindenberg GmbH"
+    },
+    "jobId": "85041",
+    "jobDetailPageUrl": "/en-de/j/careers/job-vacancies/85041-de-3364214",
+    "title": "Production Engineer",
+    "workArea": {
+      "label": "Produktion"
+    }
+  },
+  "html": {
+    "mtu": "<div id=\"jobs-list\"><div class=\"jobs-list__item\" data-job-id=\"1809-de_DE\" data-title=\"Production Engineer\" data-location=\"münchen_ger\" data-category=\"Engineering\"><a class=\"jobs-list__item_anchor\" href=\"https://www.mtu.de/job/1809\">Production Engineer</a></div></div>",
+    "diehl": "<div id=\"search-results\"><a href=\"/career/en/jobs-application/job-offers/vacancies/engineer\"><div class=\"tag\">Diehl Aviation</div><h3>Production Engineer</h3><p class=\"date\">15.10.2026</p><div class=\"city\">Gilching</div><div class=\"function\">Manufacturing/Production</div></a></div>",
+    "volkswagen": "<table id=\"searchresults\"><tr class=\"data-row\"><td><a class=\"jobTitle-link\" href=\"/Volkswagen/job/engineer/123/\">Production Engineer</a></td><td class=\"colLocation\"><span class=\"jobLocation\">Wolfsburg, DE, 38440</span></td><td class=\"colDate\"><span class=\"jobDate\">Oct 15, 2026</span></td></tr></table>",
+    "diehl_detail": "<div class=\"details-container\"><div class=\"main-75\"><section><h2>Tasks</h2><p>Repair aircraft components.</p></section><section><h2>Qualifications</h2><p>Engineering qualification.</p></section></div><aside><ul><li><strong>Working time model</strong><span>Full time</span></li><li><strong>Experience level</strong><span>Professional</span></li></ul></aside></div>",
+    "man_detail": "<div class=\"jobDisplayShell\"><div class=\"joblayouttoken\"><span class=\"rtltextaligneligible\">Production Engineer</span></div><div class=\"joblayouttoken\"><span class=\"rtltextaligneligible\">Design reliable vehicle systems.</span></div><div class=\"joblayouttoken\"><span class=\"rtltextaligneligible\">Engineering qualification required.</span></div></div>",
+    "mtu_detail": "<script type=\"application/ld+json\">{\"@type\": \"JobPosting\", \"title\": \"Production Engineer\", \"datePosted\": \"2026-10-15\", \"description\": \"<p>Repair aircraft components.</p>\", \"jobLocation\": {\"address\": {\"addressLocality\": \"Munich\", \"addressCountry\": \"Germany\"}}, \"identifier\": {\"value\": \"34361\"}}</script>",
+    "liebherr_detail": "<script type=\"application/ld+json\">{\"@type\": \"JobPosting\", \"title\": \"Production Engineer\", \"datePosted\": \"2026-10-15\", \"description\": \"<p>Repair aircraft components.</p>\", \"jobLocation\": {\"address\": {\"addressLocality\": \"Munich\", \"addressCountry\": \"DE\"}}, \"identifier\": {\"value\": \"34361\"}}</script>"
+  }
+}
+

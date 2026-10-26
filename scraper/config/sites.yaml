@@ -1,0 +1,233 @@
+# Site configurations for career scrapers
+# Add new Workday-based companies here with zero new code
+
+workday_sites:
+  - company: "Airbus"
+    tenant: "ag"
+    cluster: "wd3"
+    site: "Airbus"
+    company_industry: "Aerospace & Defense"
+    search_term: ""  # "" = all open roles; set a keyword to filter server-side
+    max_results: 100  # cap results per run; set null for no limit
+    location_country: "dcc5b7608d8644b3a93716604e78e995"  # Germany
+    posted_within_days: 1
+
+  - company: "Rolls-Royce"
+    tenant: "rollsroyce"
+    cluster: "wd3"
+    site: "professional"
+    company_industry: "Aerospace & Defense"
+    search_term: ""
+    max_results: 100
+    location_country_label: "Germany"
+    posted_within_days: 1
+
+  - company: "KION Group"
+    tenant: "kiongroup"
+    cluster: "wd3"
+    site: "KIONGroup"
+    company_industry: "Industrial Trucks & Supply Chain Solutions"
+    search_term: ""
+    max_results: 100
+    location_country_label: "Germany"
+    posted_within_days: 1
+
+  # Example: Add more Workday-based companies here
+  # - company: "Some Other Co"
+  #   tenant: "xyz"
+  #   cluster: "wd5"
+  #   site: "Careers"
+  #   company_industry: "Manufacturing"
+  #   search_term: ""
+  #   max_results: 50
+
+other_sites:
+  - company: "MTU Aero Engines"
+    platform: "mtu"
+    search_url: "https://www.mtu.de/careers/online-job-market/"
+    company_industry: "Aerospace & Defense"
+    country_filter: "Germany"
+    search_term: ""
+    max_results: 100
+    posted_within_days: 1
+
+  - company: "Audi"
+    platform: "audi"
+    api_url: "https://careers.audi.com/EREC_OPEN_DESTINATION/sap/opu/odata/sap/zaudi_ui_open_srv"
+    company_industry: "Automotive"
+    country_filter: "Germany"
+    search_term: ""
+    max_results: 100
+    posted_within_days: 1
+
+  - company: "Liebherr Aerospace"
+    platform: "liebherr"
+    search_url: "https://www.liebherr.com/en-de/careers/job-vacancies-3364212"
+    api_url: "https://www.liebherr.com/_api/app/job/list_page/en-de"
+    company_industry: "Aerospace"
+    country_filter: "Germany"
+    search_term: ""
+    max_results: 100
+    posted_within_days: 1
+
+  - company: "MAN Truck & Bus"
+    platform: "man"
+    api_url: "https://jobs.man.eu/services/recruiting/v1/jobs"
+    company_industry: "Commercial Vehicles"
+    country_filter: "Germany"
+    search_term: ""
+    max_results: 100
+    posted_within_days: 1
+
+  - company: "Volkswagen Group"
+    platform: "volkswagen"
+    search_url: "https://jobs.volkswagen-group.com/search/"
+    company_industry: "Automotive"
+    country_filter: "Germany"
+    search_term: ""
+    max_results: 100
+    posted_within_days: 1
+
+  - company: "Diehl Aviation"
+    platform: "diehl"
+    api_url: "https://new.diehl.com/career/en/vacancy/search-result"
+    company_industry: "Aerospace"
+    country_filter: "Germany"
+    search_term: ""
+    max_results: 100
+    posted_within_days: 1
+
+  - company: "Etihad Airways"
+    platform: "smartrecruiters"
+    tenant: "EtihadAirways5"
+    api_url: "https://api.smartrecruiters.com/v1/companies/EtihadAirways5/postings"
+    company_industry: "Aviation"
+    country_codes: ["DE", "AE"]
+    search_term: ""
+    max_results: 100
+    posted_within_days: 1
+
+  - company: "Emirates Group"
+    platform: "emirates"
+    api_url: "https://www.emiratesgroupcareers.com/api/v1/jobs"
+    company_industry: "Aviation"
+    countries: ["Germany", "United Arab Emirates"]
+    search_term: ""
+    max_results: 100
+    posted_within_days: 1
+
+  - company: "Mercedes-Benz"
+    platform: "mercedes_successfactors"
+    api_url: "https://jobs.api.mercedes-benz.com/search"
+    company_industry: "Automotive"
+    search_term: ""  # maps to SearchCriteria — "" = all open roles
+    max_results: 100  # cap results per run; set null for no limit
+    country_filter: "DE"  # Germany
+    posted_within_days: 1  # include postings from the configured rolling-day window
+
+  - company: "Siemens Energy"
+    platform: "siemens_energy"
+    search_url: "https://jobs.siemens-energy.com/en_US/jobs/Jobs"
+    search_term: ""
+    max_results: 100
+    country_filter: "964485"  # Germany filter value
+    posted_within_days: 1  # include postings from the configured rolling-day window
+
+  - company: "Lufthansa Group"
+    platform: "lufthansa"
+    api_url: "https://api-apply.lufthansagroup.careers/search/"
+    company_industry: "Aviation"
+    search_term: ""
+    max_results: 100
+    country_filter: "Germany"
+    posted_within_days: 1
+
+  - company: "ALTEN Consulting Services"
+    platform: "alten"
+    api_url: "https://www.alten-consulting.de/karriere/stellenangebote"
+    detail_base_url: "https://www.alten-consulting.de/karriere/stelle"
+    company_industry: "Engineering & IT Services"
+    search_term: ""
+    max_results: 100
+    posted_within_days: 1
+
+  - company: "BMW Group"
+    platform: "bmw"
+    api_url: "https://www.bmwgroup.jobs/de/en/_jcr_content/main/layoutcontainer_5337/jobfinder30.jobfinder_table.content.html"
+    company_industry: "Automotive"
+    country_filter: "Germany"
+    search_term: ""
+    max_results: 100
+    posted_within_days: 1
+
+  - company: "N3 Engine Overhaul Services"
+    platform: "n3"
+    feed_url: "https://karriere.n3eos.com/rss_generator-rss0.php?unit=n3eos&lang=de"
+    company_industry: "Aerospace & Defense"
+    country_filter: "Germany"
+    search_term: ""
+    max_results: 100
+    posted_within_days: 1
+
+  - company: "Honeywell"
+    platform: "honeywell"
+    detail_base_url: "https://careers.honeywell.com/en/sites/Honeywell/job"
+    company_industry: "Industrial Technology & Aerospace"
+    country_filter: "Germany"
+    search_term: ""
+    max_results: 100
+    posted_within_days: 1
+
+  - company: "Boeing"
+    platform: "boeing"
+    search_url: "https://jobs.boeing.com/location/germany-jobs/185/2921044/2"
+    company_industry: "Aerospace & Defense"
+    country_filter: "Germany"
+    search_term: ""
+    max_results: 100
+    posted_within_days: 1
+
+  - company: "Everllence"
+    platform: "everllence"
+    search_url: "https://jobs.everllence.com/search/"
+    company_industry: "Energy & Marine Engineering"
+    country_filter: "Germany"
+    search_term: ""
+    max_results: 100
+    posted_within_days: 1
+
+  - company: "Siemens AG"
+    platform: "siemens_ag"
+    search_url: "https://jobs.siemens.com/en_US/externaljobs/SearchJobs"
+    country_id: "812132"
+    company_industry: "Industrial Technology"
+    country_filter: "Germany"
+    search_term: ""
+    max_results: 100
+    posted_within_days: 1
+
+  - company: "DHL"
+    platform: "dhl"
+    api_url: "https://careers.dhl.com/widgets"
+    detail_base_url: "https://careers.dhl.com/global/en/job"
+    company_industry: "Logistics"
+    country_filter: "Germany"
+    search_term: ""
+    max_results: 100
+    posted_within_days: 1
+
+  - company: "Bosch"
+    platform: "bosch"
+    api_url: "https://bosch-i3-caas-api.e-spirit.cloud/bosch-i3-prod/bosch-de.jobs.content/_aggrs/get_jobs"
+    detail_api_url: "https://bosch-i3-caas-api.e-spirit.cloud/bosch-i3-prod/bosch-de.jobs.content/"
+    detail_base_url: "https://jobs.bosch.com/en/job"
+    api_token: "2b760fb7-49ef-4e83-b4ba-9c3a8d185e5e"
+    company_industry: "Engineering & Technology"
+    country_code: "de"
+    language: "en"
+    search_term: ""
+    max_results: 100
+    posted_within_days: 1
+
+
+
