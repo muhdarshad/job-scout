@@ -48,7 +48,7 @@ def test_export_text_not_formula(client):
     import io, openpyxl
     with db.Session.begin() as s:
         db.ingest(s,[sample(title='=1+1')])
-    workbook=openpyxl.load_workbook(io.BytesIO(client.get('/api/export').content))
+    workbook=openpyxl.load_workbook(io.BytesIO(client.post('/api/export', json={'keys':[j['key'] for j in client.get('/api/state').json()['jobs']]}).content))
     assert workbook.active['A2'].data_type=='s'
     assert workbook.active['A2'].value=='=1+1'
 
@@ -144,7 +144,7 @@ def test_export_includes_multiline_description_as_safe_text(client):
     description = '=SUM(A1:A2)\nPython and SQL\nGerman: B2\x00'
     with db.Session.begin() as s:
         db.ingest(s, [sample(description=description)])
-    response = client.get('/api/export')
+    response = client.post('/api/export', json={'keys':[j['key'] for j in client.get('/api/state').json()['jobs']]})
     assert response.status_code == 200
     sheet = openpyxl.load_workbook(io.BytesIO(response.content)).active
     headers = [cell.value for cell in sheet[1]]
@@ -157,8 +157,37 @@ def test_export_preserves_descriptions_over_excel_cell_limit(client):
     description = 'Python SQL\n' * 4000
     with db.Session.begin() as s:
         db.ingest(s, [sample(description=description)])
-    sheet = openpyxl.load_workbook(io.BytesIO(client.get('/api/export').content)).active
+    sheet = openpyxl.load_workbook(io.BytesIO(client.post('/api/export', json={'keys':[j['key'] for j in client.get('/api/state').json()['jobs']]}).content)).active
     headers = [cell.value for cell in sheet[1]]
     chunks = [sheet.cell(2, i + 1).value or '' for i, name in enumerate(headers) if name.startswith('description')]
     assert ''.join(chunks) == description
     assert all(len(chunk) <= 32767 for chunk in chunks)
+
+def test_export_only_selected_and_filename(client):
+    import io, openpyxl
+    with db.Session.begin() as s:
+        db.ingest(s, [sample(id='one', title='First job'), sample(id='two', title='Second job')])
+    jobs = client.get('/api/state').json()['jobs']
+    payload = {'keys':[jobs[1]['key']], 'filename':'jobscope_1345_271026.xlsx'}
+    response = client.post('/api/export', json=payload)
+    sheet = openpyxl.load_workbook(io.BytesIO(response.content)).active
+    assert sheet.max_row == 2
+    assert sheet['A2'].value == jobs[1]['title']
+    assert 'jobscope_1345_271026.xlsx' in response.headers['content-disposition']
+    assert client.get('/api/export').status_code == 405
+    assert client.post('/api/export', json={'keys':[]}).status_code == 422
+    assert client.post('/api/export', json={'keys':['f' * 64]}).status_code == 409
+    assert client.post('/api/export', json={**payload, 'filename':'../bad.xlsx'}).status_code == 422
+    assert client.post('/api/export', json={'keys':[jobs[1]['key']] * 2}).status_code == 422
+
+def test_description_blocks_preserve_structure_and_remove_active_markup(client):
+    from backend.presentation import description_blocks
+    blocks = description_blocks('<h2>Requirements</h2><p>Python &amp; SQL</p><ul><li>First skill</li><li>Second skill</li></ul><script>alert(1)</script><p>Apply now</p>')
+    assert blocks == [{'kind':'heading','text':'Requirements'}, {'kind':'paragraph','text':'Python & SQL'}, {'kind':'list','items':['First skill','Second skill']}, {'kind':'paragraph','text':'Apply now'}]
+    assert description_blocks('Your tasks:\n\n- Analysis\n- Reporting\n\nContact us') == [{'kind':'heading','text':'Your tasks:'},{'kind':'list','items':['Analysis','Reporting']},{'kind':'paragraph','text':'Contact us'}]
+    assert description_blocks(None) == []
+    with db.Session.begin() as s:
+        db.ingest(s, [sample(description='<p>First paragraph</p><p>Second paragraph</p>')])
+    job = client.get('/api/state').json()['jobs'][0]
+    assert len(job['description_blocks']) == 2
+    assert job['first_seen']

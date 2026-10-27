@@ -37,3 +37,8 @@
 .industry-badge,.skill-badge{padding:3px 8px;border-radius:5px;overflow-wrap:anywhere}.industry-badge{background:#e5eef8;color:#254d73}.skill-badge{background:#eee8fb;color:#5b3c93}
 .filters{flex-wrap:wrap}.discover-row>div{min-width:0}
 @media(max-width:700px){.multi-filter{flex:1;min-width:100%}.multi-options{width:100%;min-width:0;box-sizing:border-box}}
+
+.job-times,.job-card .job-times{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:500;color:#39465e;margin:12px 0 6px;line-height:1.6}
+.job-times time{font-variant-numeric:tabular-nums}.job-times svg{flex-shrink:0}
+.description{font-size:14px;line-height:1.8;overflow-wrap:anywhere;white-space:normal;padding:10px 0}
+.description p{white-space:pre-line;margin:0 0 1.15em}.description h3{font-size:15px;margin:1.5em 0 .6em}.description ul{margin:.6em 0 1.3em;padding-left:24px}.description li{margin:.5em 0}

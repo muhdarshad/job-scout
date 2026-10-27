@@ -146,3 +146,12 @@ Company, German requirement and minimum-experience filters support multiple chec
 Industry and extracted/matched skills appear as badges on overview rows, application cards and details. Missing source values are labeled as not stated; industries are not guessed from company names.
 
 Excel exports include the stored job description with line breaks and formula-safe text. Descriptions longer than Excel's 32,767-character cell limit continue in numbered columns. Invalid XML control characters are removed.
+
+## Selection exports and readable job details
+
+- **Export selected (N)** exports only checked jobs from Discover, Applications or individually checked archive rows. With no selection it is disabled. Changing filters or page clears selection. The API now requires POST /api/export with a nonempty list of job keys; the old all-jobs GET export is removed.
+- Filenames use the download time in your device timezone: jobscope_HHmm_ddMMyy.xlsx (for example jobscope_1345_271026.xlsx). API callers omitting the filename use Europe/Berlin time.
+- Job cards, overview rows, archive rows and details show a prominent date and time. An exact posting timestamp takes priority; date-only publications fall back to the first database entry timestamp. Refreshes never replace the first database-entry time.
+- **Experience required** is a dynamic checkbox filter using the extracted field text, including qualitative requirements. It no longer filters numeric minimum-year buckets.
+- **Show keyword-excluded jobs** reports saved counts and overrides the likely-interested restriction for excluded records. Search, company, German, experience and page/status restrictions still apply. Jobs skipped by collection were never stored and cannot be recovered by this switch.
+- Descriptions display paragraphs, headings and bullet lists. HTML is converted to text blocks; active markup is not rendered. Existing stored descriptions benefit immediately. Long flat text is split at sentence boundaries for readability.

@@ -48,8 +48,8 @@ test('one timestamp prefers publication and falls back to first database entry',
   const posted = '2026-10-25T10:00:00Z';
   assert.equal(jobTimestamp({posted_at:posted,first_seen:added}).value, posted);
   const date = jobTimestamp({date_posted:'2026-10-25',first_seen:added});
-  assert.equal(date.label, 'Posted');
-  assert.equal(date.text, new Date('2026-10-25T12:00:00').toLocaleDateString(undefined,{dateStyle:'medium'}));
+  assert.equal(date.label, 'Added');
+  assert.equal(date.text, displayTime(added));
   for (const value of ['',null,'Not recorded','Yesterday','invalid']) {
     assert.equal(jobTimestamp({posted_at:value,date_posted:value,first_seen:added}).label,'Added');
     assert.equal(jobTimestamp({posted_at:value,first_seen:added}).value,added);
@@ -59,4 +59,24 @@ test('one timestamp prefers publication and falls back to first database entry',
 test('overview highlights source industry and deduplicated extracted skills', () => {
   assert.deepEqual(jobHighlights({company_industry:'Aviation',matched_skills:['SQL','Python'],skills:'SQL, Excel'}),{industry:'Aviation',skills:['SQL','Python','Excel']});
   assert.deepEqual(jobHighlights({}),{industry:'',skills:[]});
+});
+
+import {experienceValue, experienceOptions, matchesVisibility, exportFilename} from '../src/jobFilters.js';
+test('experience filter uses exact extracted text including qualitative values', () => {
+  const jobs = [{experience_required:'Mehrjährige Erfahrung'},{experience_required:'3+ years'}, {}, {experience_required:'Mehrjährige Erfahrung'}];
+  assert.equal(experienceOptions(jobs).length,3);
+  assert.equal(matchesSelected(experienceValue(jobs[0]),['Mehrjährige Erfahrung','3+ years']),true);
+  assert.equal(matchesSelected(experienceValue(jobs[2]),['Mehrjährige Erfahrung']),false);
+  assert.equal(experienceValue({experience_required:'  '}),'Not stated');
+});
+test('show excluded takes precedence over likely-only while normal jobs retain filtering', () => {
+  assert.equal(matchesVisibility({excluded_keyword:'postbote'},true,true),true);
+  assert.equal(matchesVisibility({excluded_keyword:'postbote'},false,false),false);
+  assert.equal(matchesVisibility({likely_interested:false},true,true),false);
+  assert.equal(matchesVisibility({likely_interested:true},false,true),true);
+});
+test('filename uses local HHmm and ddMMyy and publication requires a real time', () => {
+  assert.equal(exportFilename(new Date(2026,9,27,13,45)),'jobscope_1345_271026.xlsx');
+  assert.equal(jobTimestamp({posted_at:'2026-10-25',first_seen:'2026-10-26T14:40:00Z'}).label,'Added');
+  assert.equal(jobTimestamp({posted_at:'bad',date_posted:'2026-10-25',first_seen:'2026-10-26T14:40:00Z'}).value,'2026-10-26T14:40:00Z');
 });

@@ -22,15 +22,23 @@ export function matchesSelected(value, selected) {
 }
 export function jobTimestamp(job) {
   for (const [label, raw] of [['Posted', job.posted_at], ['Posted', job.date_posted], ['Added', job.first_seen]]) {
-    if (typeof raw !== 'string' || !raw.trim()) continue;
-    const value = raw.trim();
-    if (!/^\d{4}-\d{2}-\d{2}(?:$|[T ])/.test(value)) continue;
-    const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
-    const date = new Date(dateOnly ? value + 'T12:00:00' : value);
-    if (!Number.isFinite(date.getTime())) continue;
-    return {label, value, text:dateOnly ? date.toLocaleDateString(undefined, {dateStyle:'medium'}) : displayTime(value)};
+    if (typeof raw !== 'string' || !/T\d{2}:\d{2}| \d{2}:\d{2}/.test(raw)) continue;
+    const date = new Date(raw);
+    if (Number.isFinite(date.getTime())) return {label, value:raw, text:displayTime(raw)};
   }
   return null;
+}
+export const experienceValue = job => String(job.experience_required || '').trim() || 'Not stated';
+export function experienceOptions(jobs) {
+  return [...new Set(jobs.map(experienceValue))].sort((a,b) => a.localeCompare(b, undefined, {numeric:true})).map(value => ({value,label:value}));
+}
+export function matchesVisibility(job, showExcluded, likelyOnly) {
+  if (job.excluded_keyword) return showExcluded;
+  return !likelyOnly || job.likely_interested;
+}
+export function exportFilename(date = new Date()) {
+  const pad = value => String(value).padStart(2, '0');
+  return 'jobscope_' + pad(date.getHours()) + pad(date.getMinutes()) + '_' + pad(date.getDate()) + pad(date.getMonth() + 1) + String(date.getFullYear()).slice(-2) + '.xlsx';
 }
 export function jobHighlights(job) {
   const parts = value => (Array.isArray(value) ? value : typeof value === 'string' ? value.split(/[,;|]/) : [])
