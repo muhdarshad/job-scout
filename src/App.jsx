@@ -4,7 +4,7 @@ import { MagnifyingGlass, Briefcase, MapPin, Translate, Note, DotsThree, Sliders
 import { ARCHIVED_STATUSES, experienceValue, experienceOptions, matchesVisibility, exportFilename, matchesSelected, jobTimestamp, jobHighlights, displayTime } from './jobFilters.js';
 import { createAlerts } from './alerts.js';
 
-const logo = company => Object.entries({'BMW':'bmw','Airbus':'airbus','MTU':'mtu','Lufthansa':'lufthansa','N3':'n3'}).find(([name]) => company.includes(name))?.[1];
+const logo = company => Object.entries({'BMW':'bmw','Airbus':'airbus','MTU':'mtu','Lufthansa':'lufthansa','N3':'n3'}).find(([name]) => (typeof company === 'string' ? company : '').includes(name))?.[1];
 async function api(path, method = 'GET', body) {
   const response = await fetch('/api/' + path, { method, headers: { 'Content-Type': 'application/json' }, ...(body && {body: JSON.stringify(body)}) });
   const data = await response.json();
@@ -37,8 +37,8 @@ function JobHighlights({job}) {
   const {industry, skills} = jobHighlights(job);
   return <div className="job-highlights"><span className="industry-badge">Industry: {industry || 'Not stated'}</span>{skills.length ? skills.map(skill => <span className="skill-badge" key={skill}>{skill}</span>) : <span className="muted">Skills not stated</span>}</div>;
 }
-export function App() {
-  const [data, setData] = useState(null), [page, setPage] = useState('Applications'), [query, setQuery] = useState(''), [company, setCompany] = useState([]), [german, setGerman] = useState([]), [years, setYears] = useState([]);
+export function App({initialData = null, initialPage = 'Applications'} = {}) {
+  const [data, setData] = useState(initialData), [page, setPage] = useState(initialPage), [query, setQuery] = useState(''), [company, setCompany] = useState([]), [german, setGerman] = useState([]), [years, setYears] = useState([]);
   const [selected, setSelected] = useState(null), [draft, setDraft] = useState({}), [modal, setModal] = useState(''), [error, setError] = useState(''), [toast, setToast] = useState(''), [busy, setBusy] = useState(false);
   const [statusName, setStatusName] = useState(''), [rename, setRename] = useState(''), [schedule, setSchedule] = useState({});
   const [likelyOnly, setLikelyOnly] = useState(false), [showExcluded, setShowExcluded] = useState(false);
