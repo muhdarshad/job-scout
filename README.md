@@ -125,7 +125,7 @@ The `.gitignore` excludes `.env`, local databases, virtual environments, node_mo
 - Existing keyword matches are hidden by default, not deleted; **Show keyword-excluded jobs** reveals them. Remove a keyword to restore visibility. New matching listings are filtered before the later description-enrichment pass; adapters that fetch detail metadata during listing still make those requests. Existing hard-coded scraper/ranker filters remain in effect.
 - **Likely interested** badges and **Likely interested only** use the same title-keyword rules as the existing Excel ranker. This is a keyword signal, not an assessment of qualification or a score threshold. Exclusion matches take precedence.
 - **Not fit** is added automatically to existing databases without resetting statuses, notes or schedules. **Not interested** and **Not fit** share the collapsed archive and can be restored through the job dialog.
-- Cards/rows show **Added** and **Scraped** with dates and times. Details also show first scraped and last database refresh. Scrape time records when a source's listing batch was collected, not the employer's publication time. Database-added time remains stable across refreshes. Previously collected records have no recoverable exact scrape time and show “Not recorded” until a later collection records one. Times display in the device timezone; storage uses UTC.
+- Cards, overview rows and job details show one timestamp: **Posted** when an absolute publication date is available, otherwise **Added** using the first database entry. Date-only postings display no invented time. Scrape timestamps stay internal.
 - Open **Result alerts** to opt into a beep and/or desktop notification. Permission is requested only from your click. Click **Enable / test sound** after reopening a tab to satisfy browser autoplay requirements. Keep Job Scout open: this is browser polling, not background OS push delivery. New completed/partial runs alert only when they add jobs; old runs, repeated polls and zero-new-job results do not alert. Web Locks serializes claims between tabs where supported; browsers without it use best-effort localStorage deduplication. Browser/OS notification settings, Do Not Disturb and sleeping/background tabs can delay or suppress delivery.
 
 After merging, update your checkout and rebuild without deleting the PostgreSQL volume:
@@ -138,3 +138,11 @@ docker compose up --build -d
 No destructive database migration is required: this release uses existing JSON data and settings tables. A running scrape uses the exclusions captured at its start; new settings apply on the next scrape.
 
 Additional checks: `npm run test:unit` covers minimum-year buckets, archive categories and notification deduplication. Backend regressions cover bulk rollback, notes, existing-database upgrades, reversible title filtering and timestamp semantics. GitHub Actions runs those checks plus the scraper suite and frontend build.
+
+## Overview and checkbox filters
+
+Company, German requirement and minimum-experience filters support multiple checked values on both Discover and Applications. Empty selection means all; selected values match any option within a filter, and filters combine together. Clear filter resets one filter; Escape or clicking outside closes its menu. Assignment dropdowns still choose one status.
+
+Industry and extracted/matched skills appear as badges on overview rows, application cards and details. Missing source values are labeled as not stated; industries are not guessed from company names.
+
+Excel exports include the stored job description with line breaks and formula-safe text. Descriptions longer than Excel's 32,767-character cell limit continue in numbered columns. Invalid XML control characters are removed.
