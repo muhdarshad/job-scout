@@ -1,4 +1,5 @@
 import hashlib, os
+from .presentation import description_blocks
 from scraper.job_rules import DEFAULT_EXCLUDED_KEYWORDS, excluded_keyword, likely_interested
 from datetime import datetime, timezone
 from sqlalchemy import JSON, Column, Integer, String, Text, create_engine, select
@@ -77,4 +78,4 @@ def serialize(job, keywords=()):
     return {**job.data, 'key': job.key, 'status': job.status, 'notes': job.notes,
             'version': job.version, 'first_seen': job.first_seen, 'last_seen': job.last_seen,
             'likely_interested': likely_interested(job.data.get('title', ''), keywords),
-            'excluded_keyword': excluded}
+            'excluded_keyword': excluded, 'description_blocks': description_blocks(job.data.get('description'))}

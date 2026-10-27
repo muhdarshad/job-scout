@@ -119,13 +119,13 @@ The `.gitignore` excludes `.env`, local databases, virtual environments, node_mo
 
 ## Review filters, bulk actions and alerts
 
-- **Min experience reqd** now selects the employer's explicit minimum: “2 years minimum” matches numeric minimum 2; “5+ years minimum” groups 5 and above. This replaces the old “up to” ceiling. “Not stated / no numeric minimum” includes qualitative wording and cases without an extracted mandatory numeric bound; it never means zero experience.
+- **Experience required** lists the actual extracted text as checkbox options, including numeric and qualitative requirements. No numeric bucketing is applied.
 - Check individual jobs or **Select all shown**, choose a status and press **Assign status** (maximum 1,000 per batch). A stale edit or missing record rolls back the whole batch. Notes are untouched. Changing search, filters or page clears selection. Archived jobs can be selected individually.
 - **Title exclusions** accepts one literal keyword/phrase per line, no regular expressions. Defaults cover postal delivery, parcel sorting, warehouse operatives, forklift/delivery drivers, cleaning, cashier and kitchen-helper roles in German and English. Matching ignores case, normalizes umlauts/hyphens and permits common plural/gender endings. These are starter rules; remove terms that are relevant to your search.
 - Existing keyword matches are hidden by default, not deleted; **Show keyword-excluded jobs** reveals them. Remove a keyword to restore visibility. New matching listings are filtered before the later description-enrichment pass; adapters that fetch detail metadata during listing still make those requests. Existing hard-coded scraper/ranker filters remain in effect.
 - **Likely interested** badges and **Likely interested only** use the same title-keyword rules as the existing Excel ranker. This is a keyword signal, not an assessment of qualification or a score threshold. Exclusion matches take precedence.
 - **Not fit** is added automatically to existing databases without resetting statuses, notes or schedules. **Not interested** and **Not fit** share the collapsed archive and can be restored through the job dialog.
-- Cards, overview rows and job details show one timestamp: **Posted** when an absolute publication date is available, otherwise **Added** using the first database entry. Date-only postings display no invented time. Scrape timestamps stay internal.
+- Cards, overview rows, archive rows and details show one timestamp: **Posted** when an exact publication time exists, otherwise **Added** using the first database entry. A date-only posting falls back to database date and time. Scrape timestamps stay internal.
 - Open **Result alerts** to opt into a beep and/or desktop notification. Permission is requested only from your click. Click **Enable / test sound** after reopening a tab to satisfy browser autoplay requirements. Keep Job Scout open: this is browser polling, not background OS push delivery. New completed/partial runs alert only when they add jobs; old runs, repeated polls and zero-new-job results do not alert. Web Locks serializes claims between tabs where supported; browsers without it use best-effort localStorage deduplication. Browser/OS notification settings, Do Not Disturb and sleeping/background tabs can delay or suppress delivery.
 
 After merging, update your checkout and rebuild without deleting the PostgreSQL volume:
@@ -141,8 +141,17 @@ Additional checks: `npm run test:unit` covers minimum-year buckets, archive cate
 
 ## Overview and checkbox filters
 
-Company, German requirement and minimum-experience filters support multiple checked values on both Discover and Applications. Empty selection means all; selected values match any option within a filter, and filters combine together. Clear filter resets one filter; Escape or clicking outside closes its menu. Assignment dropdowns still choose one status.
+Company, German requirement and experience-text filters support multiple checked values on both Discover and Applications. Empty selection means all; selected values match any option within a filter, and filters combine together. Clear filter resets one filter; Escape or clicking outside closes its menu. Assignment dropdowns still choose one status.
 
 Industry and extracted/matched skills appear as badges on overview rows, application cards and details. Missing source values are labeled as not stated; industries are not guessed from company names.
 
 Excel exports include the stored job description with line breaks and formula-safe text. Descriptions longer than Excel's 32,767-character cell limit continue in numbered columns. Invalid XML control characters are removed.
+
+## Selection exports and readable job details
+
+- **Export selected (N)** exports only checked jobs from Discover, Applications or individually checked archive rows. With no selection it is disabled. Changing filters or page clears selection. The API now requires POST /api/export with a nonempty list of job keys; the old all-jobs GET export is removed.
+- Filenames use the download time in your device timezone: jobscope_HHmm_ddMMyy.xlsx (for example jobscope_1345_271026.xlsx). API callers omitting the filename use Europe/Berlin time.
+- Job cards, overview rows, archive rows and details show a prominent date and time. An exact posting timestamp takes priority; date-only publications fall back to the first database entry timestamp. Refreshes never replace the first database-entry time.
+- **Experience required** is a dynamic checkbox filter using the extracted field text, including qualitative requirements. It no longer filters numeric minimum-year buckets.
+- **Show keyword-excluded jobs** reports saved counts and overrides the likely-interested restriction for excluded records. Search, company, German, experience and page/status restrictions still apply. Jobs skipped by collection were never stored and cannot be recovered by this switch.
+- Descriptions display paragraphs, headings and bullet lists. HTML is converted to text blocks; active markup is not rendered. Existing stored descriptions benefit immediately. Long flat text is split at sentence boundaries for readability.

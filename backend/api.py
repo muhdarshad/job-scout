@@ -147,16 +147,33 @@ def scrape():
         s.get(Setting, 'run_requested').data = True
     return {'queued': True}
 
-@app.get('/api/export')
-def export():
+class ExportSelection(BaseModel):
+    keys: list[str] = Field(min_length=1, max_length=1000)
+    filename: str | None = Field(default=None, pattern=r'^jobscope_\d{4}_\d{6}\.xlsx$')
+
+    @field_validator('keys')
+    @classmethod
+    def valid_keys(cls, keys):
+        import re
+        if len(set(keys)) != len(keys) or any(not re.fullmatch(r'[0-9a-f]{64}', key) for key in keys):
+            raise ValueError('Select unique, valid jobs.')
+        return keys
+
+@app.post('/api/export')
+def export(body: ExportSelection):
     import openpyxl
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    filename = body.filename or datetime.now(ZoneInfo('Europe/Berlin')).strftime('jobscope_%H%M_%d%m%y.xlsx')
     workbook = openpyxl.Workbook()
     sheet = workbook.active
     sheet.title = 'Jobs'
     columns = ['title', 'company', 'location', 'total_score', 'experience_required', 'german_required', 'status', 'notes', 'job_url', 'first_seen', 'last_seen', 'scraped_at', 'first_scraped_at', 'likely_interested', 'excluded_keyword', 'description']
     with Session() as s:
         keywords = s.get(Setting, 'title_exclusions').data
-        rows = [serialize(job, keywords) for job in s.scalars(select(Job))]
+        rows = [serialize(job, keywords) for job in s.scalars(select(Job).where(Job.key.in_(body.keys)))]
+        if len(rows) != len(body.keys):
+            raise HTTPException(409, 'Some selected jobs no longer exist. Refresh and select again.')
         # Excel cells hold at most 32,767 characters; retain long descriptions in continuations.
         from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
         for row in rows:
@@ -181,7 +198,7 @@ def export():
     data = io.BytesIO()
     workbook.save(data)
     data.seek(0)
-    return StreamingResponse(data, media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', headers={'Content-Disposition': 'attachment; filename="job-scout.xlsx"'})
+    return StreamingResponse(data, media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', headers={'Content-Disposition': f'attachment; filename="{filename}"'})
 
 if Path('dist/client').exists():
     app.mount('/', StaticFiles(directory='dist/client', html=True), name='web')
