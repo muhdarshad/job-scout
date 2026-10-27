@@ -153,13 +153,24 @@ def export():
     workbook = openpyxl.Workbook()
     sheet = workbook.active
     sheet.title = 'Jobs'
-    columns = ['title', 'company', 'location', 'total_score', 'experience_required', 'german_required', 'status', 'notes', 'job_url', 'first_seen', 'last_seen', 'scraped_at', 'first_scraped_at', 'likely_interested', 'excluded_keyword']
-    sheet.append(columns)
+    columns = ['title', 'company', 'location', 'total_score', 'experience_required', 'german_required', 'status', 'notes', 'job_url', 'first_seen', 'last_seen', 'scraped_at', 'first_scraped_at', 'likely_interested', 'excluded_keyword', 'description']
     with Session() as s:
         keywords = s.get(Setting, 'title_exclusions').data
-        for job in s.scalars(select(Job)):
-            row = serialize(job, keywords)
+        rows = [serialize(job, keywords) for job in s.scalars(select(Job))]
+        # Excel cells hold at most 32,767 characters; retain long descriptions in continuations.
+        from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
+        for row in rows:
+            row['description'] = ILLEGAL_CHARACTERS_RE.sub('', row.get('description') or '')
+        parts = max([1, *((len(row['description']) + 32766) // 32767 for row in rows)])
+        columns += [f'description_continued_{part}' for part in range(2, parts + 1)]
+        sheet.append(columns)
+        for row in rows:
+            description = row['description']
+            for part in range(1, parts + 1):
+                name = 'description' if part == 1 else f'description_continued_{part}'
+                row[name] = description[(part - 1) * 32767:part * 32767]
             values = [row.get(k, '') for k in columns]
+            values = [ILLEGAL_CHARACTERS_RE.sub('', value) if isinstance(value, str) else value for value in values]
             sheet.append(values)
             # Scraped text must never become an executable spreadsheet formula.
             for cell in sheet[sheet.max_row]:

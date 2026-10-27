@@ -138,3 +138,27 @@ def test_legacy_jobs_do_not_get_invented_scrape_times(client):
     job = client.get('/api/state').json()['jobs'][0]
     assert job['first_scraped_at'] is None
     assert job['scraped_at'] == '2026-10-26T11:00:00+00:00'
+
+def test_export_includes_multiline_description_as_safe_text(client):
+    import io, openpyxl
+    description = '=SUM(A1:A2)\nPython and SQL\nGerman: B2\x00'
+    with db.Session.begin() as s:
+        db.ingest(s, [sample(description=description)])
+    response = client.get('/api/export')
+    assert response.status_code == 200
+    sheet = openpyxl.load_workbook(io.BytesIO(response.content)).active
+    headers = [cell.value for cell in sheet[1]]
+    cell = sheet.cell(2, headers.index('description') + 1)
+    assert cell.value == description.replace('\x00', '')
+    assert cell.data_type == 's'
+
+def test_export_preserves_descriptions_over_excel_cell_limit(client):
+    import io, openpyxl
+    description = 'Python SQL\n' * 4000
+    with db.Session.begin() as s:
+        db.ingest(s, [sample(description=description)])
+    sheet = openpyxl.load_workbook(io.BytesIO(client.get('/api/export').content)).active
+    headers = [cell.value for cell in sheet[1]]
+    chunks = [sheet.cell(2, i + 1).value or '' for i, name in enumerate(headers) if name.startswith('description')]
+    assert ''.join(chunks) == description
+    assert all(len(chunk) <= 32767 for chunk in chunks)
