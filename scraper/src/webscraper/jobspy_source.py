@@ -8,6 +8,14 @@ import pandas as pd
 from .config import COLUMNS
 
 
+def filter_reposts(jobs, enabled=True):
+    if not enabled or 'is_reposted' not in jobs or 'site' not in jobs:
+        return jobs
+    linkedin = jobs['site'].astype(str).str.lower().eq('linkedin')
+    explicit = jobs['is_reposted'].map(lambda value: value is True or str(value).lower() == 'true')
+    return jobs.loc[~(linkedin & explicit)].copy()
+
+
 def fetch_jobspy(config, enrich=True, report=None):
     from jobspy import scrape_jobs
 
@@ -42,7 +50,7 @@ def fetch_jobspy(config, enrich=True, report=None):
                     )
                     empty = jobs.empty
                     if not empty:
-                        jobs = jobs.copy()
+                        jobs = filter_reposts(jobs, config.get('exclude_reposts', True))
                         jobs['search_term'], jobs['source'] = term, 'LS'
                         jobs['source_site'] = jobs['site'].astype(str).str.lower()
                         frames.append(jobs.reindex(columns=COLUMNS + ['source', 'source_site']))

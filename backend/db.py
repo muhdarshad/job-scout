@@ -41,11 +41,19 @@ DEFAULTS = {'statuses': ['New', 'Shortlisted', 'Applied', 'Interview', 'Not inte
             'run_requested': False, 'title_exclusions': DEFAULT_EXCLUDED_KEYWORDS}
 
 def init():
+    from .tracking import ArchiveClock, ARCHIVED
+    from .preferences import defaults
     Base.metadata.create_all(engine)
     with Session.begin() as s:
         for key, data in DEFAULTS.items():
             if s.get(Setting, key) is None:
                 s.add(Setting(key=key, data=data))
+        for key, data in {'preferences':defaults(), 'last_assignment':[]}.items():
+            if s.get(Setting, key) is None:
+                s.add(Setting(key=key, data=data))
+        for job in s.scalars(select(Job).where(Job.status.in_(ARCHIVED))):
+            if not s.get(ArchiveClock, job.key):
+                s.add(ArchiveClock(key=job.key, entered=now()))
         s.flush()
         statuses = s.get(Setting, 'statuses')
         if 'Not fit' not in statuses.data:
@@ -59,9 +67,12 @@ def identity(row):
     return hashlib.sha256(f'{source}|{identifier}'.encode()).hexdigest()
 
 def ingest(s, rows):
+    from .tracking import PurgedJob
     added = 0
     for row in rows:
         key, stamp = identity(row), now()
+        if s.get(PurgedJob, key):
+            continue
         row = dict(row)
         job = s.get(Job, key)
         row['first_scraped_at'] = job.data.get('first_scraped_at') if job else row.get('scraped_at')

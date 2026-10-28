@@ -24,7 +24,7 @@ def filter_titles_before_enrichment(df, excluded_keywords=()):
 
 
 def run_pipeline(max_results_per_site=None, enrich=True, extract_skills=True, output_path=None,
-                 config_path=None, workers=4, include_ls=False, ls_config_path=None, progress=True, excluded_keywords=()):
+                 config_path=None, workers=4, include_ls=False, ls_config_path=None, progress=True, excluded_keywords=(), report=None, skill_keywords=None):
     if workers < 1 or max_results_per_site is not None and max_results_per_site < 1:
         raise ValueError('Workers and result limits must be positive')
     config = load_sites_config(config_path)
@@ -34,7 +34,7 @@ def run_pipeline(max_results_per_site=None, enrich=True, extract_skills=True, ou
     ls_config = yaml.safe_load(Path(ls_path).read_text()) if include_ls else {}
     stats, frames = [], []
 
-    with ScrapeDisplay(progress) as display:
+    with ScrapeDisplay(progress, report) as display:
         def fetch_site(site, platform_name, task):
             name = f"CS / {site['company']}"
             stat = dict(source_site=name, found=0, after_titles=0, status='Complete', errors=[])
@@ -58,7 +58,7 @@ def run_pipeline(max_results_per_site=None, enrich=True, extract_skills=True, ou
                     df = enrich_descriptions(df, workday_sites=workday, other_sites=other,
                         progress_callback=lambda done, total: display.update(task, 'Enriching descriptions', done, total))
                 if extract_skills and not df.empty:
-                    df = add_skills_column(df)
+                    df = add_skills_column(df, skill_keywords)
                 display.update(task, f'Complete: {len(df)} jobs', 1, 1)
                 return df, [stat]
             except Exception as exc:
@@ -75,7 +75,7 @@ def run_pipeline(max_results_per_site=None, enrich=True, extract_skills=True, ou
                 raw['scraped_at'] = datetime.now(timezone.utc).isoformat()
                 df = filter_titles_before_enrichment(raw, excluded_keywords)
                 if extract_skills and not df.empty:
-                    df = add_skills_column(df)
+                    df = add_skills_column(df, skill_keywords)
                 rows = [dict(source_site=name, found=int((raw.source_site == name).sum()),
                              after_titles=int((df.source_site == name).sum()),
                              status='Partial / check logs' if errors else 'Complete', errors=errors if i == 0 else [])

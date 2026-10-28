@@ -5,7 +5,8 @@ from rich.table import Table
 
 
 class ScrapeDisplay:
-    def __init__(self, enabled=True):
+    def __init__(self, enabled=True, callback=None):
+        self.callback, self.names = callback, {}
         self.console = Console()
         self.progress = Progress(SpinnerColumn(), TextColumn('{task.description}'), BarColumn(),
                                  TextColumn('{task.fields[stage]}'), TimeElapsedColumn(),
@@ -19,10 +20,16 @@ class ScrapeDisplay:
         self.progress.stop()
 
     def add(self, name):
-        return self.progress.add_task(name, total=None, stage='Queued')
+        task = self.progress.add_task(name, total=None, stage='Queued')
+        self.names[task] = name
+        if self.callback:
+            self.callback(name, 'Queued', None, None)
+        return task
 
     def update(self, task, stage, completed=None, total=None):
         self.progress.update(task, stage=stage, completed=completed, total=total)
+        if self.callback:
+            self.callback(self.names[task], stage, completed, total)
 
 
 def print_summary(stats):

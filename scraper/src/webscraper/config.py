@@ -20,6 +20,8 @@ COLUMNS = [
     "location",
     "date_posted",
     "posted_at",
+    "is_reposted",
+    "repost_evidence",
     "job_type",
     "job_level",
     "job_function",

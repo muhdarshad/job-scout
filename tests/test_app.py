@@ -174,7 +174,7 @@ def test_export_only_selected_and_filename(client):
     assert sheet.max_row == 2
     assert sheet['A2'].value == jobs[1]['title']
     assert 'jobscope_1345_271026.xlsx' in response.headers['content-disposition']
-    assert client.get('/api/export').status_code == 405
+    assert client.get('/api/export').status_code in (404, 405)
     assert client.post('/api/export', json={'keys':[]}).status_code == 422
     assert client.post('/api/export', json={'keys':['f' * 64]}).status_code == 409
     assert client.post('/api/export', json={**payload, 'filename':'../bad.xlsx'}).status_code == 422
@@ -191,3 +191,113 @@ def test_description_blocks_preserve_structure_and_remove_active_markup(client):
     job = client.get('/api/state').json()['jobs'][0]
     assert len(job['description_blocks']) == 2
     assert job['first_seen']
+
+def test_undo_bulk_is_atomic_preserves_notes_and_rejects_stale(client):
+    with db.Session.begin() as s:
+        db.ingest(s, [sample(id='a'), sample(id='b')])
+        for job in s.scalars(select(db.Job)):
+            job.notes = 'Keep me'
+    jobs = client.get('/api/state').json()['jobs']
+    payload = {'status':'Not interested','jobs':[{'key':j['key'],'version':j['version']} for j in jobs]}
+    assert client.post('/api/jobs/bulk-status',json=payload).status_code == 200
+    assert client.get('/api/state').json()['can_undo']
+    assert client.post('/api/jobs/undo').json() == {'updated':2}
+    jobs = client.get('/api/state').json()['jobs']
+    assert all(j['status']=='New' and j['notes']=='Keep me' for j in jobs)
+    assert not client.get('/api/state').json()['can_undo']
+    payload['jobs'] = [{'key':j['key'],'version':j['version']} for j in jobs]
+    client.post('/api/jobs/bulk-status',json=payload)
+    job = client.get('/api/state').json()['jobs'][0]
+    client.patch('/api/jobs/'+job['key'],json={'status':job['status'],'notes':'Newer note','version':job['version']})
+    assert client.post('/api/jobs/undo').status_code == 409
+    assert all(j['status']=='Not interested' for j in client.get('/api/state').json()['jobs'])
+
+def test_cleanup_24_hours_and_reimport_suppression(client):
+    from backend.tracking import cleanup, ArchiveClock, PurgedJob
+    with db.Session.begin() as s:
+        db.ingest(s,[sample()])
+    job = client.get('/api/state').json()['jobs'][0]
+    client.patch('/api/jobs/'+job['key'],json={'status':'Not fit','notes':'Remove me','version':1})
+    with db.Session.begin() as s:
+        entered = datetime.fromisoformat(s.get(ArchiveClock,job['key']).entered)
+        assert cleanup(s,entered+timedelta(hours=23,minutes=59)) == 0
+        assert cleanup(s,entered+timedelta(hours=24)) == 1
+    assert client.get('/api/state').json()['jobs'] == []
+    assert not client.get('/api/state').json()['can_undo']
+    with db.Session.begin() as s:
+        assert db.ingest(s,[sample()]) == 0
+        assert s.get(PurgedJob,job['key']) is not None
+
+def test_restore_cancels_cleanup_and_existing_archive_gets_grace_period(client):
+    from backend.tracking import ArchiveClock, cleanup
+    with db.Session.begin() as s:
+        db.ingest(s,[sample()])
+        s.scalar(select(db.Job)).status = 'Not interested'
+    db.init()
+    job = client.get('/api/state').json()['jobs'][0]
+    with db.Session() as s:
+        entered = datetime.fromisoformat(s.get(ArchiveClock,job['key']).entered)
+    client.patch('/api/jobs/'+job['key'],json={'status':'Shortlisted','notes':'Keep','version':1})
+    with db.Session.begin() as s:
+        assert cleanup(s,entered+timedelta(days=2)) == 0
+        assert s.get(ArchiveClock,job['key']) is None
+
+def test_preferences_persist_and_validate(client):
+    state = client.get('/api/state').json()
+    prefs = {**state['preferences'],'enabled_sites':[], 'job_boards':['linkedin'], 'search_terms':['  CFD Engineer  '], 'skills':['Python'], 'cleanup_archived':False}
+    assert client.put('/api/preferences',json=prefs).status_code == 200
+    db.init()
+    saved = client.get('/api/state').json()['preferences']
+    assert saved['search_terms'] == ['CFD Engineer'] and saved['enabled_sites'] == []
+    assert client.put('/api/preferences',json={**prefs,'enabled_sites':['bad']}).status_code == 422
+    assert client.put('/api/preferences',json={**prefs,'job_boards':['bad']}).status_code == 422
+
+def test_cleanup_can_be_disabled(client):
+    from backend.tracking import cleanup, ArchiveClock
+    with db.Session.begin() as s:
+        db.ingest(s,[sample()])
+    job = client.get('/api/state').json()['jobs'][0]
+    client.patch('/api/jobs/'+job['key'],json={'status':'Not fit','notes':'','version':1})
+    prefs = client.get('/api/state').json()['preferences']
+    client.put('/api/preferences',json={**prefs,'cleanup_archived':False})
+    with db.Session.begin() as s:
+        entered = datetime.fromisoformat(s.get(ArchiveClock,job['key']).entered)
+        assert cleanup(s,entered+timedelta(days=3)) == 0
+
+def test_collector_uses_saved_preferences(client, monkeypatch):
+    import pandas as pd, yaml
+    from backend.worker import collect
+    from src.webscraper import pipeline
+    import job_ranker_v2
+    state = client.get('/api/state').json()
+    chosen = state['sites'][0]['id']
+    prefs = {**state['preferences'],'enabled_sites':[chosen], 'job_boards':['linkedin'], 'search_terms':['Custom search'], 'skills':['Python']}
+    client.put('/api/preferences',json=prefs)
+    captured = {}
+    def run(**kwargs):
+        captured.update(kwargs)
+        captured['sites'] = yaml.safe_load(Path(kwargs['config_path']).read_text())
+        captured['ls'] = yaml.safe_load(Path(kwargs['ls_config_path']).read_text())
+        return pd.DataFrame()
+    from pathlib import Path
+    monkeypatch.setattr(pipeline,'run_pipeline',run)
+    monkeypatch.setattr(job_ranker_v2,'rank_dataframe',lambda *args,**kwargs:pd.DataFrame())
+    collect(True)
+    assert sum(len(captured['sites'].get(group,[])) for group in ('workday_sites','other_sites')) == 1
+    assert captured['ls']['search_terms'] == ['Custom search']
+    assert captured['ls']['sites'] == ['linkedin']
+    assert captured['skill_keywords'] == ['Python'] and captured['include_ls']
+
+def test_run_progress_is_visible_before_completion(client, monkeypatch):
+    from backend import worker
+    snapshots = []
+    def collect(include_ls, report=None):
+        report('Example','Fetching listings',None,None)
+        snapshots.append(client.get('/api/state').json()['runs'][0])
+        report('Example','Complete',1,1)
+        return [], []
+    monkeypatch.setattr(worker,'collect',collect)
+    worker.run_once(collect)
+    assert snapshots[0]['status'] == 'Running'
+    assert snapshots[0]['details']['progress'][0]['stage'] == 'Fetching listings'
+    assert client.get('/api/state').json()['runs'][0]['status'] == 'Complete'

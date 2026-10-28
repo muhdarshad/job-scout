@@ -190,7 +190,7 @@ def previous_job_keys(output_dir: Path) -> set[tuple[str, str]]:
     return {(str(row.Title).strip().lower(), str(row.Company).strip().lower()) for row in previous.itertuples()}
 
 
-def rank_dataframe(input_csv: str | os.PathLike, output_dir: str | os.PathLike = DEFAULT_OUTPUT_DIR) -> pd.DataFrame:
+def rank_dataframe(input_csv: str | os.PathLike, output_dir: str | os.PathLike = DEFAULT_OUTPUT_DIR, skill_keywords=None) -> pd.DataFrame:
     df = load_and_filter(input_csv)
     previous = previous_job_keys(Path(output_dir))
     if previous:
@@ -205,7 +205,8 @@ def rank_dataframe(input_csv: str | os.PathLike, output_dir: str | os.PathLike =
     for column in requirements:
         df[column] = requirements[column]
     df["full_text"] = df.apply(combined_text, axis=1)
-    df["matched_skills"] = df["full_text"].apply(find_skills)
+    patterns = SKILL_PATTERNS if skill_keywords is None else {skill:SKILL_PATTERNS.get(skill, [word_pattern(skill)]) for skill in skill_keywords}
+    df["matched_skills"] = df["full_text"].apply(lambda text: {skill for skill, rules in patterns.items() if any(rule.search(text) for rule in rules)})
     df["skill_score"] = df.apply(lambda row: min(len(row["matched_skills"]) / MIN_SKILL_DENOMINATOR, 1) * 40 * seniority_multiplier(row), axis=1)
     df["language_score"] = df["full_text"].apply(language_score)
     df["industry_score"] = df.apply(industry_score, axis=1)

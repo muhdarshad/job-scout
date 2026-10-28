@@ -206,12 +206,12 @@ def scrape_jobs(
         jobs_df = pd.concat(filtered_dfs, ignore_index=True)
 
         # Step 3: Ensure all desired columns are present, adding missing ones as empty
-        for column in desired_order:
+        for column in desired_order + ['is_reposted', 'repost_evidence']:
             if column not in jobs_df.columns:
                 jobs_df[column] = None  # Add missing columns as empty
 
         # Reorder the DataFrame according to the desired order
-        jobs_df = jobs_df[desired_order]
+        jobs_df = jobs_df[desired_order + ['is_reposted', 'repost_evidence']]
 
         # Step 4: Sort the DataFrame as required
         return jobs_df.sort_values(
