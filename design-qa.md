@@ -36,3 +36,11 @@ The existing code/design target is retained. Added labelled minimum-experience c
 Current environment: workspace offline and cloud browser unavailable. No new rendered capture or browser interaction check was possible. Source review and automated checks cannot establish visual fidelity. Manual follow-up: verify narrow-screen bulk toolbar, checkbox focus/selection, archive restoration, modal errors, and actual OS notifications/audio after granting permissions.
 
 final result: blocked
+
+## 2026-10-28 compact review and Settings
+
+Final result: blocked (visual verification).
+
+Existing Application Studio colors, typography, sidebar and component patterns are retained. Applications cards are reduced to title/company and selection. Discover rows keep their fields while reducing padding. A Settings page groups source controls, search terms/skills, filtering/tracking, and real run progress.
+
+Automated React rendering, backend lifecycle tests, scraper tests and builds are used for functional checks. The preview daemon mailbox is unavailable; a manually started Vite preview at terminal.local:4173 returned ERR_CONNECTION_REFUSED in the cloud browser. No screenshots, visual comparison, responsive visual QA or real multi-tab opening verification could be completed. Do not describe this change as visually verified.

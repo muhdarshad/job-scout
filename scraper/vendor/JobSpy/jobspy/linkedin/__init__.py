@@ -170,6 +170,11 @@ class LinkedIn(Scraper):
         job_list = job_list[: scraper_input.results_wanted]
         return JobResponse(jobs=job_list)
 
+    @staticmethod
+    def _repost_marker(node):
+        text = node.get_text(' ', strip=True) if node else ''
+        return text if re.search(r'\b(?:reposted|erneut veröffentlicht)\b', text, re.I) else None
+
     def _process_job(
         self, job_card: Tag, job_id: str, full_descr: bool
     ) -> Optional[JobPost]:
@@ -224,6 +229,7 @@ class LinkedIn(Scraper):
         if full_descr:
             job_details = self._get_job_details(job_id)
             description = job_details.get("description")
+        repost_evidence = self._repost_marker(metadata_card) or job_details.get('repost_evidence')
         is_remote = is_job_remote(title, description, location)
 
         return JobPost(
@@ -234,6 +240,8 @@ class LinkedIn(Scraper):
             location=location,
             is_remote=is_remote,
             date_posted=date_posted,
+            is_reposted=True if repost_evidence else None,
+            repost_evidence=repost_evidence,
             job_url=f"{self.base_url}/jobs/view/{job_id}",
             compensation=compensation,
             job_type=job_details.get("job_type"),
@@ -293,6 +301,7 @@ class LinkedIn(Scraper):
             else None
         )
         return {
+            'repost_evidence': self._repost_marker(soup.select_one('.posted-time-ago__text')),
             "description": description,
             "job_level": parse_job_level(soup),
             "company_industry": parse_company_industry(soup),

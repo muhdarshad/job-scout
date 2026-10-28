@@ -8,7 +8,7 @@
     "build": "vite build && node scripts/prepare-sites-build.mjs",
     "preview": "vite preview",
     "test:sites": "node --test tests/sites-worker.test.mjs",
-    "test:unit": "node --test tests/job-filters.test.mjs tests/alerts.test.mjs tests/app-render.test.mjs"
+    "test:unit": "node --test tests/job-filters.test.mjs tests/alerts.test.mjs tests/app-render.test.mjs tests/selected-links.test.mjs"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",

@@ -256,6 +256,8 @@ class JobPost(BaseModel):
     listing_type: str | None = None
 
     # LinkedIn specific
+    is_reposted: bool | None = None
+    repost_evidence: str | None = None
     job_level: str | None = None
     applicant_count: str | None = None  # raw text, e.g. "25 applicants", "Over 100 applicants"
 

@@ -6,6 +6,8 @@ from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select, update
+from .tracking import assign, undo
+from .preferences import Preferences, catalog, builtin_filters
 from .db import Job, Run, Setting, Session, init, serialize
 
 @asynccontextmanager
@@ -41,7 +43,7 @@ def state():
         runs = s.scalars(select(Run).order_by(Run.id.desc()).limit(20)).all()
         keywords = s.get(Setting, 'title_exclusions').data
         return {'jobs': [serialize(j, keywords) for j in s.scalars(select(Job))],
-                'title_exclusions': keywords,
+                'title_exclusions': keywords, 'preferences':s.get(Setting, 'preferences').data, 'sites':catalog(), 'built_in_filters':builtin_filters(), 'can_undo':bool(s.get(Setting, 'last_assignment').data),
                 'statuses': s.get(Setting, 'statuses').data, 'schedule': s.get(Setting, 'schedule').data,
                 'requested': s.get(Setting, 'run_requested').data, 'demo': os.getenv('DEMO_MODE') == '1',
                 'runs': [{'id': r.id, 'started': r.started, 'finished': r.finished, 'status': r.status, 'details': r.details} for r in runs]}
@@ -54,12 +56,8 @@ class JobEdit(BaseModel):
 @app.patch('/api/jobs/{key}')
 def edit(key: str, body: JobEdit):
     with Session.begin() as s:
-        if body.status not in s.get(Setting, 'statuses').data:
-            raise HTTPException(400, 'Unknown status')
-        result = s.execute(update(Job).where(Job.key == key, Job.version == body.version).values(
-            status=body.status, notes=body.notes, version=body.version + 1))
-        if not result.rowcount:
-            raise HTTPException(409, 'Job changed in another window. Reload and retry.')
+        from types import SimpleNamespace
+        assign(s, [SimpleNamespace(key=key, version=body.version)], body.status, body.notes)
         return serialize(s.get(Job, key))
 
 class BulkJob(BaseModel):
@@ -76,14 +74,19 @@ def bulk_status(body: BulkStatusEdit):
         raise HTTPException(400, 'Duplicate job selection')
     # One transaction: a stale/missing row rolls back the entire batch.
     with Session.begin() as s:
-        if body.status not in s.get(Setting, 'statuses', with_for_update=True).data:
-            raise HTTPException(400, 'Unknown status')
-        for job in sorted(body.jobs, key=lambda item: item.key):
-            changed = s.execute(update(Job).where(Job.key == job.key, Job.version == job.version)
-                .values(status=body.status, version=Job.version + 1))
-            if not changed.rowcount:
-                raise HTTPException(409, 'Some selected jobs changed. Reload, reselect and retry; no jobs were updated.')
+        assign(s, body.jobs, body.status)
     return {'updated': len(body.jobs)}
+
+@app.post('/api/jobs/undo')
+def undo_assignment():
+    with Session.begin() as s:
+        return {'updated':undo(s)}
+
+@app.put('/api/preferences')
+def preferences(body: Preferences):
+    with Session.begin() as s:
+        s.get(Setting, 'preferences').data = body.model_dump()
+    return body
 
 class ExclusionsEdit(BaseModel):
     keywords: list[str] = Field(max_length=200)
