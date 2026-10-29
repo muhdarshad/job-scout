@@ -99,20 +99,9 @@ In another terminal run `npm run dev`. Demo data only seeds an empty database; i
 - The API currently returns all retained jobs for client-side filtering. Add server-side pagination/indexed query columns when your database grows substantially.
 - Logos are small website favicons used for identification; they differ from the larger wordmarks in the concept image. See `public/logos/SOURCES.md`.
 
-## Create the new GitHub repository
+## GitHub repository
 
-No new GitHub repository was created automatically: the available connector supports file/branch/PR operations but does not expose repository creation, and no authenticated GitHub CLI is available here.
-
-Create an empty **private** repository named `job-scout` under your account, without a README or .gitignore, then run these commands from this project folder:
-
-```bash
-git init
-git add .
-git commit -m "Build local job discovery and application tracker"
-git branch -M main
-git remote add origin https://github.com/muhdarshad/job-scout.git
-git push -u origin main
-```
+The project is hosted in the private [`muhdarshad/job-scout`](https://github.com/muhdarshad/job-scout) repository. The default branch is `main`.
 
 The `.gitignore` excludes `.env`, local databases, virtual environments, node_modules and build output. Keep PostgreSQL backups outside the repository.
 
