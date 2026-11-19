@@ -1,6 +1,6 @@
 import hashlib, os
 from .presentation import description_blocks
-from scraper.job_rules import DEFAULT_EXCLUDED_KEYWORDS, excluded_keyword, likely_interested
+from scraper.job_rules import DEFAULT_EXCLUDED_KEYWORDS, excluded_keyword, likely_interested, resolve_rules
 from datetime import datetime, timezone
 from sqlalchemy import JSON, Column, Integer, String, Text, create_engine, select
 from sqlalchemy.orm import declarative_base, sessionmaker
@@ -38,7 +38,7 @@ class Run(Base):
 
 DEFAULTS = {'statuses': ['New', 'Shortlisted', 'Applied', 'Interview', 'Not interested', 'Not fit'],
             'schedule': {'enabled': True, 'interval_minutes': 30, 'include_ls': False},
-            'run_requested': False, 'title_exclusions': DEFAULT_EXCLUDED_KEYWORDS}
+            'run_requested': False, 'title_exclusions': DEFAULT_EXCLUDED_KEYWORDS, 'builtin_filters': {}}
 
 def init():
     from .tracking import ArchiveClock, ARCHIVED
@@ -84,9 +84,14 @@ def ingest(s, rows):
         s.flush()
     return added
 
-def serialize(job, keywords=()):
+def load_rules(s):
+    """Built-in scraper rules: defaults overlaid with the user's saved customisations."""
+    row = s.get(Setting, 'builtin_filters')
+    return resolve_rules(row.data if row else {})
+
+def serialize(job, keywords=(), rules=None):
     excluded = excluded_keyword(job.data.get('title', ''), keywords)
     return {**job.data, 'key': job.key, 'status': job.status, 'notes': job.notes,
             'version': job.version, 'first_seen': job.first_seen, 'last_seen': job.last_seen,
-            'likely_interested': likely_interested(job.data.get('title', ''), keywords),
+            'likely_interested': likely_interested(job.data.get('title', ''), keywords, rules),
             'excluded_keyword': excluded, 'description_blocks': description_blocks(job.data.get('description'))}

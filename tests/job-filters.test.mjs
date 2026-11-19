@@ -80,3 +80,51 @@ test('filename uses local HHmm and ddMMyy and publication requires a real time',
   assert.equal(jobTimestamp({posted_at:'2026-10-25',first_seen:'2026-10-26T14:40:00Z'}).label,'Added');
   assert.equal(jobTimestamp({posted_at:'bad',date_posted:'2026-10-25',first_seen:'2026-10-26T14:40:00Z'}).value,'2026-10-26T14:40:00Z');
 });
+
+import {experienceBin, germanBin, sourceType, binOptions, applyFilters, EXPERIENCE_BINS, GERMAN_BINS, SOURCE_BINS, SOURCE_LABELS} from '../src/jobFilters.js';
+test('experience values collapse into a few bins and unknown is never zero', () => {
+  assert.equal(experienceBin({}), 'Not stated');
+  assert.equal(experienceBin({experience_required:'not stated', experience_min_years:null}), 'Not stated');
+  assert.equal(experienceBin({experience_required:'Mehrjährige Erfahrung', experience_min_years:null}), 'Optional / qualitative only');
+  assert.equal(experienceBin({experience_min_years:0}), 'Up to 1 year');
+  assert.equal(experienceBin({experience_min_years:1}), 'Up to 1 year');
+  assert.equal(experienceBin({experience_min_years:3}), '3 years');
+  assert.equal(experienceBin({experience_min_years:12}), '5+ years');
+});
+test('German values group by level; preferred and not-required stay separate', () => {
+  assert.equal(germanBin({}), 'Not stated');
+  assert.equal(germanBin({german_required:'not stated'}), 'Not stated');
+  assert.equal(germanBin({german_required:'fluent', german_requirement:'required'}), 'Advanced (C1+ / fluent)');
+  assert.equal(germanBin({german_required:'B2 | C1', german_requirement:'required | required'}), 'Advanced (C1+ / fluent)');
+  assert.equal(germanBin({german_required:'B2', german_requirement:'stated'}), 'Intermediate (B1–B2 / good)');
+  assert.equal(germanBin({german_required:'A2', german_requirement:'required'}), 'Basic (A1–A2)');
+  assert.equal(germanBin({german_required:'fluent', german_requirement:'preferred'}), 'Preferred only');
+  assert.equal(germanBin({german_required:'unspecified', german_requirement:'not required'}), 'Not required');
+  assert.equal(germanBin({german_required:'unspecified', german_requirement:'required'}), 'Level unspecified');
+});
+test('source type comes from the CS / LS prefix and falls back to the source column', () => {
+  assert.equal(sourceType({source_site:'CS / Airbus'}), 'CS');
+  assert.equal(sourceType({source_site:'LS / linkedin'}), 'LS');
+  assert.equal(sourceType({source:'LS'}), 'LS');
+  assert.equal(sourceType({}), 'CS');
+});
+test('options are built only from the supplied scope, in fixed order, with counts', () => {
+  const scope = [{experience_min_years:3},{experience_min_years:3},{}];
+  assert.deepEqual(binOptions(scope, experienceBin, EXPERIENCE_BINS), [{value:'Not stated',label:'Not stated · 1'},{value:'3 years',label:'3 years · 2'}]);
+  assert.deepEqual(binOptions([{source_site:'LS / indeed'}], sourceType, SOURCE_BINS, SOURCE_LABELS), [{value:'LS',label:'Job boards (LS) · 1'}]);
+  assert.ok(GERMAN_BINS.includes('Not stated'));
+});
+test('applyFilters combines source, German, experience and visibility filters', () => {
+  const jobs = [
+    {title:'A',company:'Airbus',source_site:'CS / Airbus',german_required:'B2',german_requirement:'required',experience_min_years:2},
+    {title:'B',company:'Acme',source_site:'LS / linkedin',german_required:'not stated',experience_min_years:null},
+    {title:'Postbote',company:'Post',source_site:'CS / Post',excluded_keyword:'postbote'}];
+  const names = filters => applyFilters(jobs, filters).map(job => job.title);
+  assert.deepEqual(names({}), ['A','B']);
+  assert.deepEqual(names({source:['CS']}), ['A']);
+  assert.deepEqual(names({source:['LS']}), ['B']);
+  assert.deepEqual(names({source:['CS'], showExcluded:true}), ['A','Postbote']);
+  assert.deepEqual(names({german:['Intermediate (B1–B2 / good)']}), ['A']);
+  assert.deepEqual(names({years:['Not stated']}), ['B']);
+  assert.deepEqual(names({query:'acme', source:['CS']}), []);
+});

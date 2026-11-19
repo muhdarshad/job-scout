@@ -9,7 +9,7 @@ import yaml
 
 from .config import COLUMNS, load_sites_config
 from .platforms import get_platform
-from .utils.filtering import EXCLUDED_TITLES, EXCLUDED_SENIORITY, EXCLUDED_TITLE_PATTERN
+from .utils import filtering
 from .enrichment import enrich_descriptions, add_skills_column
 from .jobspy_source import fetch_jobspy
 from .terminal import ScrapeDisplay
@@ -18,15 +18,19 @@ from .terminal import ScrapeDisplay
 def filter_titles_before_enrichment(df, excluded_keywords=()):
     if 'title' not in df:
         return df
-    keep = ~df['title'].fillna('').astype(str).str.contains(EXCLUDED_TITLE_PATTERN, na=False)
+    keep = pd.Series(True, index=df.index)
+    if filtering.active_pattern() is not None:
+        keep = ~df['title'].fillna('').astype(str).str.contains(filtering.active_pattern(), na=False)
     keep &= ~df['title'].fillna('').map(lambda title: bool(excluded_keyword(title, excluded_keywords)))
     return df.loc[keep].reset_index(drop=True)
 
 
 def run_pipeline(max_results_per_site=None, enrich=True, extract_skills=True, output_path=None,
-                 config_path=None, workers=4, include_ls=False, ls_config_path=None, progress=True, excluded_keywords=(), report=None, skill_keywords=None):
+                 config_path=None, workers=4, include_ls=False, ls_config_path=None, progress=True, excluded_keywords=(), report=None, skill_keywords=None, rules=None):
     if workers < 1 or max_results_per_site is not None and max_results_per_site < 1:
         raise ValueError('Workers and result limits must be positive')
+    # Title/seniority exclusions apply to adapters and the pre-enrichment filter alike.
+    filtering.configure(rules)
     config = load_sites_config(config_path)
     workday, other = config.get('workday_sites', []), config.get('other_sites', [])
     sites = [(s, 'workday') for s in workday] + [(s, s.get('platform')) for s in other]

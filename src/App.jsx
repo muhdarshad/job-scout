@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { MagnifyingGlass, Briefcase, MapPin, Translate, Note, DotsThree, SlidersHorizontal, X, ArrowSquareOut, DownloadSimple, ArrowsClockwise, Clock, CaretRight, Buildings, Circle, Check, WarningCircle } from '@phosphor-icons/react';
 
-import { ARCHIVED_STATUSES, experienceValue, experienceOptions, matchesVisibility, exportFilename, matchesSelected, jobTimestamp, jobHighlights, displayTime } from './jobFilters.js';
+import { ARCHIVED_STATUSES, EXPERIENCE_BINS, GERMAN_BINS, SOURCE_BINS, SOURCE_LABELS, applyFilters, binOptions, experienceBin, germanBin, sourceType, exportFilename, jobTimestamp, jobHighlights, displayTime } from './jobFilters.js';
 import { Settings, RunProgress } from './Settings.jsx';
 import { selectedLinks } from './selectedLinks.js';
 import { createAlerts } from './alerts.js';
@@ -10,7 +10,7 @@ const logo = company => Object.entries({'BMW':'bmw','Airbus':'airbus','MTU':'mtu
 async function api(path, method = 'GET', body) {
   const response = await fetch('/api/' + path, { method, headers: { 'Content-Type': 'application/json' }, ...(body && {body: JSON.stringify(body)}) });
   const data = await response.json();
-  if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Please check your input.');
+  if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : Array.isArray(data.detail) && data.detail.length ? data.detail.map(item => String(item.msg || '').replace(/^Value error, /, '')).join(' ') : 'Please check your input.');
   return data;
 }
 function Brand({company}) { const name = logo(company); return name ? <img className="brand-logo" src={'/logos/' + name + '.png'} alt=""/> : <Buildings size={30}/>; }
@@ -39,8 +39,8 @@ function JobHighlights({job}) {
   const {industry, skills} = jobHighlights(job);
   return <div className="job-highlights"><span className="industry-badge">Industry: {industry || 'Not stated'}</span>{skills.length ? skills.map(skill => <span className="skill-badge" key={skill}>{skill}</span>) : <span className="muted">Skills not stated</span>}</div>;
 }
-export function App({initialData = null, initialPage = 'Applications'} = {}) {
-  const [data, setData] = useState(initialData), [page, setPage] = useState(initialPage), [query, setQuery] = useState(''), [company, setCompany] = useState([]), [german, setGerman] = useState([]), [years, setYears] = useState([]);
+export function App({initialData = null, initialPage = 'Discover'} = {}) {
+  const [data, setData] = useState(initialData), [page, setPage] = useState(initialPage), [query, setQuery] = useState(''), [company, setCompany] = useState([]), [german, setGerman] = useState([]), [years, setYears] = useState([]), [source, setSource] = useState([]);
   const [selected, setSelected] = useState(null), [draft, setDraft] = useState({}), [modal, setModal] = useState(''), [error, setError] = useState(''), [toast, setToast] = useState(''), [busy, setBusy] = useState(false);
   const [statusName, setStatusName] = useState(''), [rename, setRename] = useState(''), [schedule, setSchedule] = useState({});
   const [likelyOnly, setLikelyOnly] = useState(false), [showExcluded, setShowExcluded] = useState(false);
@@ -59,7 +59,7 @@ export function App({initialData = null, initialPage = 'Applications'} = {}) {
     } catch(e) {setError(e.message);}
     finally {loading.current = false;}
   }
-  useEffect(() => {setChecked({});}, [page, query, company, german, years, likelyOnly, showExcluded]);
+  useEffect(() => {setChecked({});}, [page, query, company, german, years, source, likelyOnly, showExcluded]);
   function toggleJob(job) {
     setChecked(previous => {
       const next = {...previous};
@@ -71,16 +71,19 @@ export function App({initialData = null, initialPage = 'Applications'} = {}) {
   useEffect(() => { if(toast) {const timer = setTimeout(() => setToast(''), 3500); return () => clearTimeout(timer);} }, [toast]);
   async function action(fn, message) {setBusy(true); setError(''); try {await fn(); await reload(); setToast(message);} catch(e) {setError(e.message);} finally {setBusy(false);} }
   function open(job) {setSelected(job); setDraft({status:job.status, notes:job.notes, version:job.version});}
-  function navigate(value) {setPage(value); setQuery(''); setCompany([]); setGerman([]); setYears([]);}
+  function navigate(value) {setPage(value); setQuery(''); setCompany([]); setGerman([]); setYears([]); setSource([]);}
   if (!data) return <div className="loading"><ArrowsClockwise size={32}/><h2>{error || 'Opening your workspace…'}</h2><button onClick={reload}>Retry</button></div>;
   const jobs = data.jobs, fresh = jobs.filter(j => j.status === 'New' && !j.excluded_keyword).length;
-  const filtered = jobs.filter(j => (!query || [j.title,j.company,j.location,j.notes].join(' ').toLowerCase().includes(query.toLowerCase())) && matchesSelected(j.company, company) && matchesSelected(j.german_required, german) && matchesSelected(experienceValue(j), years) && matchesVisibility(j, showExcluded, likelyOnly)).sort((a,b) => b.total_score - a.total_score);
+  const filtered = applyFilters(jobs, {query, company, german, years, source, showExcluded, likelyOnly}).sort((a,b) => b.total_score - a.total_score);
   const boardStatuses = data.statuses.filter(s => s !== 'New' && !ARCHIVED_STATUSES.includes(s));
-  const shown = filtered.filter(job => page === 'Discover' ? job.status === 'New' : boardStatuses.includes(job.status));
-  const excludedCount = jobs.filter(job => job.excluded_keyword).length;
+  // Filter choices and counts describe only the jobs on this page: unassigned (New) on Discover, board stages on Applications.
+  const inScope = job => page === 'Discover' ? job.status === 'New' : boardStatuses.includes(job.status);
+  const scope = jobs.filter(inScope);
+  const shown = filtered.filter(inScope);
+  const excludedCount = scope.filter(job => job.excluded_keyword).length;
   const archived = jobs.filter(job => ARCHIVED_STATUSES.includes(job.status));
   function checkBox(job) {return <input type="checkbox" className="job-select" aria-label={'Select ' + job.title + ' at ' + job.company} checked={Boolean(checked[job.key])} onChange={() => toggleJob(job)}/>;}
-  function tags(job) {return <div className="job-tags">{job.likely_interested && <span className="interest-badge">Likely interested</span>}{job.excluded_keyword && <span className="exclusion-badge">Excluded: {job.excluded_keyword}</span>}</div>;}
+  function tags(job) {return <div className="job-tags"><span className="source-badge">{job.source_site || sourceType(job)}</span>{job.likely_interested && <span className="interest-badge">Likely interested</span>}{job.excluded_keyword && <span className="exclusion-badge">Excluded: {job.excluded_keyword}</span>}</div>;}
   async function applyBulk() {
     await action(async () => {
       await api('jobs/bulk-status', 'POST', {jobs:Object.values(checked), status:bulkStatus});
@@ -113,14 +116,15 @@ export function App({initialData = null, initialPage = 'Applications'} = {}) {
     <main><header><div className="tabs">{['Discover','Applications'].map(name => <button className={page === name ? 'active' : ''} onClick={() => navigate(name)} key={name}>{name}</button>)}</div><button className="alerts-button" onClick={() => setModal('alerts')}>Result alerts</button><div className="date">{new Date().toLocaleDateString('en-US', {weekday:'long',month:'long',day:'numeric',year:'numeric'})}{data.demo && <span className="demo">Demo data</span>}</div></header>
     <div className="content"><div className="page-heading"><div><h1>{page === 'Applications' ? 'My applications' : page === 'Discover' ? 'Discover opportunities' : page === 'Settings' ? 'Settings' : 'Your sources'}</h1><p>{page === 'Applications' ? 'Track and manage your engineering job applications.' : page === 'Discover' ? 'Find the right role. Keep the opportunities that matter.' : page === 'Settings' ? 'Control sources, ranking preferences and your workspace.' : 'Keep track of collection runs and scheduling.'}</p></div><div className="heading-actions">{page === 'Applications' ? <><button className="primary" onClick={() => navigate('Discover')}><MagnifyingGlass size={19}/>Review new jobs · {fresh}</button></> : <><button className="primary" disabled={busy || data.requested} onClick={() => action(() => api('scrape','POST'), 'Scrape queued')}><ArrowsClockwise size={18}/>{data.requested ? 'Scrape queued' : 'Check for jobs'}</button></>}</div></div>
     {error && <div className="error" role="alert"><WarningCircle size={20}/>{error}<button aria-label="Dismiss error" className="icon-button" onClick={() => setError('')}><X/></button></div>}
-    {page === 'Settings' ? <Settings data={data} busy={busy} save={value => action(() => api('preferences','PUT',value),'Settings saved for the next scrape')} openStatuses={() => {setRename('');setStatusName('');setModal('statuses');}} openExclusions={() => {setKeywords(data.title_exclusions.join('\n'));setModal('keywords');}} openSchedule={() => {setSchedule(data.schedule);setModal('schedule');}}/> : page !== 'Sources' ? <><div className="filters"><label className="search"><MagnifyingGlass size={22}/><input aria-label="Search jobs" placeholder="Search jobs, companies or notes..." value={query} onChange={e => setQuery(e.target.value)}/></label><MultiSelect label="Company" value={company} onChange={setCompany} options={[...new Set(jobs.map(j => j.company).filter(Boolean))].sort().map(value => ({value,label:value}))}/><MultiSelect label="German requirement" value={german} onChange={setGerman} options={[...new Set(jobs.map(j => j.german_required || 'Not stated'))].sort().map(value => ({value,label:value}))}/><MultiSelect label="Experience required" value={years} onChange={setYears} options={experienceOptions(jobs)}/></div>
+    {page === 'Settings' ? <Settings data={data} busy={busy} save={value => action(() => api('preferences','PUT',value),'Settings saved for the next scrape')} openStatuses={() => {setRename('');setStatusName('');setModal('statuses');}} openExclusions={() => {setKeywords(data.title_exclusions.join('\n'));setModal('keywords');}} openSchedule={() => {setSchedule(data.schedule);setModal('schedule');}}/> : page !== 'Sources' ? <><div className="filters"><label className="search"><MagnifyingGlass size={22}/><input aria-label="Search jobs" placeholder="Search jobs, companies or notes..." value={query} onChange={e => setQuery(e.target.value)}/></label><MultiSelect label="Company" value={company} onChange={setCompany} options={[...new Set(jobs.map(j => j.company).filter(Boolean))].sort().map(value => ({value,label:value}))}/><MultiSelect label="Source" value={source} onChange={setSource} options={binOptions(scope, sourceType, SOURCE_BINS, SOURCE_LABELS)}/><MultiSelect label="German requirement" value={german} onChange={setGerman} options={binOptions(scope, germanBin, GERMAN_BINS)}/><MultiSelect label="Experience required" value={years} onChange={setYears} options={binOptions(scope, experienceBin, EXPERIENCE_BINS)}/></div>
       <div className="filter-options">
         <label><input type="checkbox" checked={likelyOnly} onChange={e => setLikelyOnly(e.target.checked)}/>Likely interested only</label>
-        <label><input type="checkbox" checked={showExcluded} onChange={e => setShowExcluded(e.target.checked)}/>Show keyword-excluded jobs ({excludedCount} saved)</label>
+        <label className={!excludedCount && !showExcluded ? 'disabled' : ''}><input type="checkbox" checked={showExcluded} disabled={!excludedCount && !showExcluded} onChange={e => setShowExcluded(e.target.checked)}/>Show keyword-excluded jobs ({excludedCount} on this page)</label>
 
       </div>
-      <p className="filter-hint">Experience options use the extracted “Experience required” text exactly. Check any values you want to include.</p>
-      {showExcluded && <p className="filter-hint" role="status">{shown.filter(job => job.excluded_keyword).length} keyword-excluded jobs shown on this page; {excludedCount} saved in total. Other search filters and job statuses still apply. Jobs skipped during scraping were not saved and cannot be revealed here.</p>}
+      <p className="filter-hint">Experience and German options group the extracted requirement text and list only jobs on this page; counts are shown after each option. Check any values you want to include.</p>
+      {!excludedCount && !showExcluded && <p className="filter-hint" role="status">No keyword-excluded jobs are saved on this page. New matches are skipped while scraping, so only jobs stored before an exclusion was added can appear here.</p>}
+      {showExcluded && <p className="filter-hint" role="status">{shown.filter(job => job.excluded_keyword).length} of {excludedCount} keyword-excluded jobs match your other filters on this page. Jobs skipped during scraping were not saved and cannot be revealed here.</p>}
       <div className="bulk-toolbar">
         <label><input type="checkbox" aria-label="Select all shown jobs" checked={shown.length > 0 && shown.every(job => checked[job.key])} onChange={e => setChecked(e.target.checked ? Object.fromEntries(shown.slice(0,1000).map(job => [job.key,{key:job.key,version:job.version}])) : {})}/>Select all shown{shown.length > 1000 ? ' (first 1,000)' : ''}</label>
         <span>{Object.keys(checked).length} selected</span>

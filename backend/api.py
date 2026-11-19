@@ -7,8 +7,9 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select, update
 from .tracking import assign, undo
-from .preferences import Preferences, catalog, builtin_filters
-from .db import Job, Run, Setting, Session, init, serialize
+from scraper.job_rules import default_rules
+from .preferences import Preferences, catalog
+from .db import Job, Run, Setting, Session, init, load_rules, serialize
 
 @asynccontextmanager
 async def lifespan(app):
@@ -41,9 +42,9 @@ def health():
 def state():
     with Session() as s:
         runs = s.scalars(select(Run).order_by(Run.id.desc()).limit(20)).all()
-        keywords = s.get(Setting, 'title_exclusions').data
-        return {'jobs': [serialize(j, keywords) for j in s.scalars(select(Job))],
-                'title_exclusions': keywords, 'preferences':s.get(Setting, 'preferences').data, 'sites':catalog(), 'built_in_filters':builtin_filters(), 'can_undo':bool(s.get(Setting, 'last_assignment').data),
+        keywords, rules = s.get(Setting, 'title_exclusions').data, load_rules(s)
+        return {'jobs': [serialize(j, keywords, rules) for j in s.scalars(select(Job))],
+                'title_exclusions': keywords, 'preferences':s.get(Setting, 'preferences').data, 'sites':catalog(), 'builtin_filters':rules, 'builtin_filter_defaults':default_rules(), 'can_undo':bool(s.get(Setting, 'last_assignment').data),
                 'statuses': s.get(Setting, 'statuses').data, 'schedule': s.get(Setting, 'schedule').data,
                 'requested': s.get(Setting, 'run_requested').data, 'demo': os.getenv('DEMO_MODE') == '1',
                 'runs': [{'id': r.id, 'started': r.started, 'finished': r.finished, 'status': r.status, 'details': r.details} for r in runs]}
@@ -58,7 +59,7 @@ def edit(key: str, body: JobEdit):
     with Session.begin() as s:
         from types import SimpleNamespace
         assign(s, [SimpleNamespace(key=key, version=body.version)], body.status, body.notes)
-        return serialize(s.get(Job, key))
+        return serialize(s.get(Job, key), s.get(Setting, 'title_exclusions').data, load_rules(s))
 
 class BulkJob(BaseModel):
     key: str = Field(min_length=64, max_length=64)
@@ -85,7 +86,14 @@ def undo_assignment():
 @app.put('/api/preferences')
 def preferences(body: Preferences):
     with Session.begin() as s:
-        s.get(Setting, 'preferences').data = body.model_dump()
+        s.get(Setting, 'preferences').data = body.model_dump(exclude={'builtin_filters'})
+        if body.builtin_filters is not None:
+            overrides = body.builtin_filters.overrides()
+            row = s.get(Setting, 'builtin_filters')
+            if row is None:
+                s.add(Setting(key='builtin_filters', data=overrides))
+            else:
+                row.data = overrides
     return body
 
 class ExclusionsEdit(BaseModel):
@@ -173,8 +181,8 @@ def export(body: ExportSelection):
     sheet.title = 'Jobs'
     columns = ['title', 'company', 'location', 'total_score', 'experience_required', 'german_required', 'status', 'notes', 'job_url', 'first_seen', 'last_seen', 'scraped_at', 'first_scraped_at', 'likely_interested', 'excluded_keyword', 'description']
     with Session() as s:
-        keywords = s.get(Setting, 'title_exclusions').data
-        rows = [serialize(job, keywords) for job in s.scalars(select(Job).where(Job.key.in_(body.keys)))]
+        keywords, rules = s.get(Setting, 'title_exclusions').data, load_rules(s)
+        rows = [serialize(job, keywords, rules) for job in s.scalars(select(Job).where(Job.key.in_(body.keys)))]
         if len(rows) != len(body.keys):
             raise HTTPException(409, 'Some selected jobs no longer exist. Refresh and select again.')
         # Excel cells hold at most 32,767 characters; retain long descriptions in continuations.

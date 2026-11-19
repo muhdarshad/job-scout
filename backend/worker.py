@@ -6,7 +6,7 @@ from .preferences import ROOT as SCRAPER_ROOT
 from datetime import datetime, timezone
 from pathlib import Path
 from sqlalchemy import select, text
-from .db import Run, Setting, Session, engine, ingest, init, now
+from .db import Run, Setting, Session, engine, ingest, init, load_rules, now
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scraper'))
@@ -19,6 +19,7 @@ def collect(include_ls, report=None):
     with Session() as s:
         keywords = s.get(Setting, 'title_exclusions').data
         preferences = s.get(Setting, 'preferences').data
+        rules = load_rules(s)
     # Empty per-run history directory disables workbook-based duplicate removal.
     # Database source identity preserves records and user tracking across runs.
     with tempfile.TemporaryDirectory() as directory:
@@ -33,10 +34,10 @@ def collect(include_ls, report=None):
         ls_file.write_text(yaml.safe_dump(ls_config))
         frame = run_pipeline(workers=int(os.getenv('SCRAPE_WORKERS', '4')),
             include_ls=include_ls and bool(preferences['job_boards']) and bool(preferences['search_terms']), output_path=csv, progress=False, excluded_keywords=keywords,
-            config_path=config_file, ls_config_path=ls_file, report=report, skill_keywords=preferences['skills'])
+            config_path=config_file, ls_config_path=ls_file, report=report, skill_keywords=preferences['skills'], rules=rules)
         if report:
             report('Ranking', 'Scoring jobs', None, None)
-        ranked = rank_dataframe(csv, directory, skill_keywords=preferences['skills'])
+        ranked = rank_dataframe(csv, directory, skill_keywords=preferences['skills'], rules=rules)
         if not ranked.empty:
             ranked['matched_skills'] = ranked['matched_skills'].map(sorted)
         rows = json.loads(ranked.to_json(orient='records'))
