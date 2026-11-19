@@ -301,3 +301,52 @@ def test_run_progress_is_visible_before_completion(client, monkeypatch):
     assert snapshots[0]['status'] == 'Running'
     assert snapshots[0]['details']['progress'][0]['stage'] == 'Fetching listings'
     assert client.get('/api/state').json()['runs'][0]['status'] == 'Complete'
+
+def test_builtin_filters_default_edit_validate_and_reset(client):
+    from scraper.job_rules import default_rules
+    state = client.get('/api/state').json()
+    assert state['builtin_filters'] == default_rules() == state['builtin_filter_defaults']
+    prefs = state['preferences']
+    edited = {**default_rules(), 'excluded_seniority': [r'\bsenior\b'], 'full_time_only': False}
+    assert client.put('/api/preferences', json={**prefs, 'builtin_filters': edited}).status_code == 200
+    saved = client.get('/api/state').json()
+    assert saved['builtin_filters']['excluded_seniority'] == [r'\bsenior\b'] and saved['builtin_filters']['full_time_only'] is False
+    assert saved['builtin_filters']['excluded_titles'] == default_rules()['excluded_titles']
+    with db.Session() as s:
+        # Only differences from the defaults are stored, so untouched lists follow future default updates.
+        assert set(s.get(db.Setting, 'builtin_filters').data) == {'excluded_seniority', 'full_time_only'}
+        assert 'builtin_filters' not in s.get(db.Setting, 'preferences').data
+    bad = client.put('/api/preferences', json={**prefs, 'builtin_filters': {**edited, 'excluded_titles': ['(unclosed']}})
+    assert bad.status_code == 422 and 'Excluded titles' in bad.text
+    assert client.get('/api/state').json()['builtin_filters']['excluded_titles'] == default_rules()['excluded_titles']
+    assert client.put('/api/preferences', json={**prefs, 'builtin_filters': default_rules()}).status_code == 200
+    with db.Session() as s:
+        assert s.get(db.Setting, 'builtin_filters').data == {}
+    # Omitting builtin_filters leaves saved rules untouched.
+    client.put('/api/preferences', json={**prefs, 'builtin_filters': edited})
+    client.put('/api/preferences', json=prefs)
+    assert client.get('/api/state').json()['builtin_filters']['excluded_seniority'] == [r'\bsenior\b']
+
+def test_likely_interested_badge_follows_saved_rules(client):
+    with db.Session.begin() as s:
+        db.ingest(s, [sample(title='Reporting Analyst')])
+    assert client.get('/api/state').json()['jobs'][0]['likely_interested'] is True
+    from scraper.job_rules import default_rules
+    prefs = client.get('/api/state').json()['preferences']
+    client.put('/api/preferences', json={**prefs, 'builtin_filters': {**default_rules(), 'interested_titles': ['cfd']}})
+    assert client.get('/api/state').json()['jobs'][0]['likely_interested'] is False
+
+def test_collector_passes_saved_builtin_rules(client, monkeypatch):
+    import pandas as pd
+    from backend.worker import collect
+    from src.webscraper import pipeline
+    import job_ranker_v2
+    from scraper.job_rules import default_rules
+    prefs = client.get('/api/state').json()['preferences']
+    client.put('/api/preferences', json={**prefs, 'builtin_filters': {**default_rules(), 'excluded_requirements': []}})
+    seen = {}
+    monkeypatch.setattr(pipeline, 'run_pipeline', lambda **kwargs: seen.update(pipeline=kwargs['rules']) or pd.DataFrame())
+    monkeypatch.setattr(job_ranker_v2, 'rank_dataframe', lambda *args, **kwargs: seen.update(ranker=kwargs['rules']) or pd.DataFrame())
+    collect(False)
+    assert seen['pipeline']['excluded_requirements'] == [] and seen['ranker']['excluded_requirements'] == []
+    assert seen['ranker']['excluded_seniority'] == default_rules()['excluded_seniority']

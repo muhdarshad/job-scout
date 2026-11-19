@@ -1,26 +1,26 @@
-"""Shared title exclusions applied before detail requests."""
+"""Shared title exclusions applied before detail requests.
 
-import re
+The rule lists live in ``job_rules`` so the app's Settings page can edit them; this module only
+holds the pattern that is active for the current scrape.
+"""
 
-EXCLUDED_TITLES = [
-    r"electrical engineer", r"elektrotechniker", r"elektroingenieur", r"mechatroniker",
-    r"mechatronic", r"electronics engineer", r"elektronik", r"software developer",
-    r"software engineer", r"softwareentwickler", r"it technician", r"it support specialist",
-    r"desktop support engineer", r"infrastructure technician", r"bauingenieur", r"electrician",
-]
+from job_rules import EXCLUDED_SENIORITY, EXCLUDED_TITLES, title_exclusion_regex
 
-EXCLUDED_SENIORITY = [
-    r"werkstudent", r"working student", r"v\.i\.e", r"\bvie program\b", r"\bvie\b",
-    r"intern(?!ational)", r"internship", r"masterarbeit", r"master thesis", r"masterand",
-    r"bachelor'?s thesis", r"praktikant", r"praktikum", r"\bsenior\b", r"\bsr\.\b",
-    r"\blead\b", r"\bprincipal\b", r"head of", r"\bdirector\b", r"post.?doctoral",
-    r"premaster", r"abschlussarbeit",
-]
+DEFAULT_TITLE_PATTERN = title_exclusion_regex()
+EXCLUDED_TITLE_PATTERN = DEFAULT_TITLE_PATTERN
+_active = DEFAULT_TITLE_PATTERN
 
-EXCLUDED_TITLE_PATTERN = re.compile("|".join(EXCLUDED_TITLES + EXCLUDED_SENIORITY), re.IGNORECASE)
 
+def configure(rules=None):
+    """Select the title exclusions used by adapters and the pipeline; ``None`` restores defaults."""
+    global _active
+    _active = title_exclusion_regex(rules) if rules is not None else DEFAULT_TITLE_PATTERN
+    return _active
+
+
+def active_pattern():
+    return _active
 
 
 def title_allowed(title):
-    return not EXCLUDED_TITLE_PATTERN.search(title or "")
-
+    return _active is None or not _active.search(title or "")

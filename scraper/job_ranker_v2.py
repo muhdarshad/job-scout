@@ -58,7 +58,7 @@ SKILL_PATTERNS = {
 
 
 # ---------- APPROVED TITLE KEYWORDS ----------
-from job_rules import NOT_INTERESTED_PATTERNS, INTERESTED_PATTERNS, NOT_INTERESTED_REGEX, INTERESTED_REGEX
+from job_rules import NOT_INTERESTED_PATTERNS, INTERESTED_PATTERNS, NOT_INTERESTED_REGEX, INTERESTED_REGEX, alternation, default_rules, title_regex
 
 def _series(df: pd.DataFrame, column: str) -> pd.Series:
     return df[column].fillna("").astype(str) if column in df else pd.Series("", index=df.index, dtype=str)
@@ -70,44 +70,29 @@ def _freshness_series(df: pd.DataFrame) -> pd.Series:
     return exact.fillna(dates)
 
 
-def load_and_filter(input_csv: str | os.PathLike) -> pd.DataFrame:
+def load_and_filter(input_csv: str | os.PathLike, rules=None) -> pd.DataFrame:
+    rules = rules or default_rules()
     df = pd.read_csv(input_csv)
     missing = {"title", "company"} - set(df.columns)
     if missing:
         raise ValueError(f"Input CSV is missing required columns: {', '.join(sorted(missing))}")
 
     # Approved title exclusions take precedence over interest matches.
-    df = df[~_series(df, "title").str.contains(NOT_INTERESTED_REGEX)].copy()
+    not_interested = title_regex(rules, "not_interested_titles")
+    if not_interested:
+        df = df[~_series(df, "title").str.contains(not_interested)].copy()
 
-    job_type = _series(df, "job_type").str.lower().str.replace(r"[^a-z]", "", regex=True)
-    df = df[(job_type == "") | job_type.str.contains("fulltime")]
+    if rules["full_time_only"]:
+        job_type = _series(df, "job_type").str.lower().str.replace(r"[^a-z]", "", regex=True)
+        df = df[(job_type == "") | job_type.str.contains("fulltime")]
 
-    excluded_titles = [
-        r"electrical engineer", r"elektrotechniker", r"elektroingenieur", r"mechatroniker",
-        r"mechatronic", r"electronics engineer", r"elektronik", r"software developer",
-        r"software engineer", r"softwareentwickler", r"it technician", r"it support specialist",
-        r"desktop support engineer", r"infrastructure technician", r"bauingenieur", r"electrician",
-    ]
-    df = df[~_series(df, "title").str.contains("|".join(excluded_titles), case=False, regex=True)]
+    def drop_matching(frame, text, patterns):
+        regex = alternation(tuple(patterns), False)
+        return frame if regex is None else frame[~text(frame).str.contains(regex)]
 
-    excluded_seniority = [
-        r"werkstudent", r"working student", r"v\.i\.e", r"\bvie program\b", r"\bvie\b",
-        r"intern(?!ational)", r"internship", r"masterarbeit", r"master thesis", r"masterand",
-        r"bachelor'?s thesis", r"praktikant", r"praktikum", r"\bsenior\b", r"\bsr\.\b",
-        r"\blead\b", r"\bprincipal\b", r"head of", r"\bdirector\b", r"post.?doctoral",
-        r"premaster", r"abschlussarbeit",
-    ]
-    title_level = _series(df, "title") + " " + _series(df, "job_level")
-    df = df[~title_level.str.contains("|".join(excluded_seniority), case=False, regex=True)]
-
-    excluded_requirements = [
-        r"eu nationality", r"eu citizenship", r"european union nationality", r"eu-staatsbürgerschaft",
-        r"eu passport required", r"five or more years of professional experience", r"sehr gute deutsch",
-        r"5\+ years of experience", r"german language\s*[-:]\s*fluent", r"minimum 5 years of experience",
-        r"more than five years", r"five years of professional experience", r"deutsch mindestens c1", r"nato or eu security clearance",
-        r"Deutsch auf Muttersprachlerniveau"
-    ]
-    df = df[~_series(df, "description").str.contains("|".join(excluded_requirements), case=False, regex=True)]
+    df = drop_matching(df, lambda frame: _series(frame, "title"), rules["excluded_titles"])
+    df = drop_matching(df, lambda frame: _series(frame, "title") + " " + _series(frame, "job_level"), rules["excluded_seniority"])
+    df = drop_matching(df, lambda frame: _series(frame, "description"), rules["excluded_requirements"])
     keys = _series(df, "title").str.strip().str.casefold() + "|" + _series(df, "company").str.strip().str.casefold()
     return df.loc[~keys.duplicated()].reset_index(drop=True)
 
@@ -190,8 +175,8 @@ def previous_job_keys(output_dir: Path) -> set[tuple[str, str]]:
     return {(str(row.Title).strip().lower(), str(row.Company).strip().lower()) for row in previous.itertuples()}
 
 
-def rank_dataframe(input_csv: str | os.PathLike, output_dir: str | os.PathLike = DEFAULT_OUTPUT_DIR, skill_keywords=None) -> pd.DataFrame:
-    df = load_and_filter(input_csv)
+def rank_dataframe(input_csv: str | os.PathLike, output_dir: str | os.PathLike = DEFAULT_OUTPUT_DIR, skill_keywords=None, rules=None) -> pd.DataFrame:
+    df = load_and_filter(input_csv, rules)
     previous = previous_job_keys(Path(output_dir))
     if previous:
         before = len(df)
