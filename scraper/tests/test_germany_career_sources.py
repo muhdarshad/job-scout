@@ -142,15 +142,32 @@ def test_siemens_ag_continues_after_excluded_page(monkeypatch):
     assert session.get.call_args_list[0].kwargs["params"]["42386"] == "[812132]"
 
 
-def test_boeing_pagination_and_listing_date_filter(monkeypatch):
-    def page(id, title):
-        return f'''<section data-selector-name="searchresults" data-total-pages="2" data-ajax-url="/search-jobs/results">
-          <div id="search-results-list"><li><a class="search-results__job-link" data-job-id="{id}" href="/job/role/{id}">{title}</a>
-          <span class="location">Hamburg</span><span class="date">{date.today().strftime('%m/%d/%Y')}</span></li></div></section>'''
-    session = client(monkeypatch, "boeing", [response(page("1", "Senior Engineer")), response(payload={"results": page("2", "Engineer")})])
-    jobs = get_platform("boeing").fetch_jobs(config("boeing"), max_results=1)
-    assert [j["id"] for j in jobs] == ["2"] and jobs[0]["date_posted"] == TODAY
-    assert session.get.call_args.kwargs["params"]["FacetTerm"] == "2921044"
+def test_boeing_follows_next_links_and_reads_month_first_dates(monkeypatch):
+    def page(jobs, next_href=None):
+        items = "".join(f'''<li><a class="search-results__job-link" data-job-id="{id}" href="/job/role/{id}">{title}</a>
+          <span class="location">{location}</span><span class="date">{posted}</span></li>''' for id, title, location, posted in jobs)
+        nav = f'<nav class="pagination"><a class="next" href="{next_href}">Next</a></nav>' if next_href else               '<nav class="pagination"><a class="next disabled" href="#">Next</a></nav>'
+        return f'<section data-selector-name="searchresults"><div id="search-results-list">{items}</div></section>{nav}'
+    dotted, slashed = date.today().strftime("%m.%d.%Y"), date.today().strftime("%m/%d/%Y")
+    old = (date.today() - timedelta(days=10)).strftime("%m.%d.%Y")
+    session = client(monkeypatch, "boeing", [
+        response(page([("1", "Senior Engineer", "Hamburg", dotted), ("2", "Engineer", "Hamburg, Germany", dotted),
+                       ("3", "Engineer Old", "Munich", old)], "/location/germany-jobs/185/2921044/2/2")),
+        response(page([("2", "Engineer", "Hamburg, Germany", dotted), ("4", "Engineer Two", "Munich", slashed)])),
+    ])
+    jobs = get_platform("boeing").fetch_jobs(config("boeing"))
+    assert [j["id"] for j in jobs] == ["2", "4"]
+    assert [j["date_posted"] for j in jobs] == [TODAY, TODAY]
+    assert [j["location"] for j in jobs] == ["Hamburg, Germany", "Munich, Germany"]
+    assert session.get.call_args.args[0] == "https://jobs.boeing.com/location/germany-jobs/185/2921044/2/2"
+    assert session.get.call_count == 2
+
+
+def test_boeing_listing_dates_are_month_first():
+    from src.webscraper.platforms.boeing import listing_date
+    assert listing_date("11.05.2026") == "2026-11-05"
+    assert listing_date("10/30/2026") == "2026-10-30"
+    assert listing_date("") is None and listing_date("19.11.2026") is None
 
 
 def test_enrichment_dispatches_all_new_sources(monkeypatch):
