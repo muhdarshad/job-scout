@@ -1,167 +1,181 @@
-# Job Scout — Application Studio
+# Job Scout
 
-A local-first job discovery and application tracker. React frontend, FastAPI API, PostgreSQL database, and one scheduled Python scraping worker, packaged with Docker Compose.
+A local-first job discovery and application tracker. Job Scout regularly scrapes company career portals (Airbus, Lufthansa, BMW, Siemens, Bosch and more) and, optionally, LinkedIn and Indeed. It ranks the results and lets you review, filter and track applications in your browser.
 
-## Start on your computer
+It runs as a React frontend, a FastAPI backend, a PostgreSQL database and a scheduled Python scraping worker, all started together with Docker Compose.
 
-1. Install and start Docker Desktop with Docker Compose support.
-2. Extract this project into a new folder, separate from `custom_webscraper`.
-3. Copy `.env.example` to `.env` and replace the example password with a long random alphanumeric password.
-4. From this folder run:
+## Screenshots
 
-```bash
-docker compose up --build -d
-```
+**Discover**: new jobs, ranked and filterable, with extracted requirements and skills.
 
-Open `http://localhost:8000`. The database starts empty. The worker immediately runs the company scrapers, then waits 30 minutes after each run finishes. Jobs appear automatically; the interface refreshes every 15 seconds. First collection may take several minutes.
+![Discover view](docs/screenshots/discover.png)
 
-```bash
-docker compose logs -f worker
-docker compose stop
-docker compose start
-```
+**Applications**: a board for tracking application stages, including custom stages.
 
-Your computer must remain awake and Docker must remain running. The app binds only to your computer's loopback interface. There is no cloud deployment or authentication layer. Do not expose this service publicly without adding authentication, HTTPS and appropriate deployment controls.
+![Applications board](docs/screenshots/applications.png)
 
-## Features
+**Settings**: search terms, skills, tracking options and the editable scraper filters.
 
-- Application board with Shortlisted, Applied and Interview stages.
-- Add custom stages and rename stages without losing their jobs.
-- Drag jobs between stages or edit their status in the details dialog.
-- Persistent notes and optimistic edit conflict detection.
-- Opens on Discover. Filter by company, source (company sites CS / job boards LS), German level and required experience.
-- Search titles, companies, locations and personal notes.
-- Original descriptions and extracted requirement evidence.
-- Existing personalized 0–80 ranking; scores are not probabilities.
-- Excel export, including notes and statuses; scraped strings are written as text.
-- Sources screen with run summaries, per-source errors, pause/resume and interval settings.
-- Optional LS job boards; disabled by default for the frequent schedule. Enable in schedule settings to include the existing LinkedIn/Indeed/Google searches with their existing pacing.
-- PostgreSQL volume persists jobs across container restarts.
+![Settings](docs/screenshots/settings.png)
 
-## Existing scraper integration
+## Tech stack
 
-`scraper/` is a source snapshot from `muhdarshad/custom_webscraper` at commit `45e7f5ee607f8a4d55297de341e0f4717a2e2205` (26 October 2026). It includes the platform adapters, JobSpy fork/license, requirement extractor, ranker and offline regression tests. Two inherited Excel integration tests now resolve columns by header instead of obsolete fixed positions. It excludes old spreadsheets, browser logs, node_modules and GitHub scheduled workflows. The previous repository has not been changed.
+| Layer | Tools |
+| --- | --- |
+| Frontend | React 19, Vite, plain CSS, Phosphor Icons, browser Notification and Web Locks APIs |
+| Backend | Python 3.12, FastAPI, Uvicorn, SQLAlchemy 2 |
+| Database | PostgreSQL 17 (SQLite for demo mode) |
+| Scraping and data | Requests, BeautifulSoup, pandas, PyYAML, a vendored JobSpy fork (LinkedIn/Indeed) |
+| Export | openpyxl (Excel) |
+| DevOps | Docker, Docker Compose (multi-stage build, health checks), GitHub Actions CI |
+| Testing | pytest, httpx, Node test runner |
 
-The worker calls `run_pipeline()` and `rank_dataframe()`. It gives the ranker a fresh temporary output directory, disabling workbook-history filtering. PostgreSQL deduplicates across runs by source plus source job ID (URL or a title/company/location fallback if absent). Scraped fields update independently of notes and application status. Source records remain distinct across portals. The existing ranker's within-run title/company deduplication and hard exclusions are preserved, including its experience/language exclusions; filters in the UI cannot recover jobs excluded by that ranker.
+## Engineering highlights
 
-Edit `scraper/config/sites.yaml` and `scraper/config/jobspy.yaml` to configure sources. The config folder is mounted read-only into the worker and changes are read on subsequent runs. Existing one-day posting windows and result caps remain unchanged. Unknown dates may therefore be excluded. A long offline period can miss jobs outside these windows: widen the source windows for a catch-up run. The app does not declare jobs closed simply because they were absent from a filtered or failed scrape.
+- **20+ scraper adapters** for company career portals (Workday, SuccessFactors, custom APIs and HTML pages) that all produce one common job schema. They run in parallel with a thread pool and are paced to avoid overloading the sites.
+- **NLP-style requirement extraction**: German level, years of experience and skills are pulled out of free-text descriptions in German and English, then fed into a personalized ranking.
+- **One scheduled worker at a time**: a PostgreSQL advisory lock stops two workers from scraping at once. Runs are spaced from when the last one finished, and an unfinished run is marked *Interrupted* after a restart.
+- **Edits don't overwrite each other**: each job has a version number, so a stale edit is rejected instead of silently replacing a newer one. Bulk status changes and undo succeed or fail as a whole.
+- **Duplicate-free storage**: jobs are keyed by source and source ID, so scraped fields refresh while your notes and statuses stay. Deleted jobs leave only a hash marker, which stops them from coming back.
+- **Rules you can edit at runtime**: the scraper filters used to be hard-coded. They are now validated regular-expression lists that you change from the UI.
+- **Safe Excel export**: scraped text is written in a way that can't turn into spreadsheet formulas, and long descriptions are split across cells.
+- **Runs only on your machine**: Docker Compose binds the app to localhost, runs it as a non-root container user and keeps the database in a persistent volume. CI runs the backend, scraper and frontend tests on every push.
 
-## Scheduling and storage
+## Requirements
 
-Compose starts the database, waits for health, starts the app and then the worker. The app creates the initial schema on first start. PostgreSQL advisory locking allows only one scheduled worker. Runs are sequential; scheduled cadence is measured from completion to avoid overlap. Manual requests coalesce into one pending run. On restart, an unfinished run is marked Interrupted. Failures are recorded and retried at the configured interval.
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows, macOS or Linux), installed and running
+- [Git](https://git-scm.com/downloads) to download the project (or download the ZIP from GitHub)
 
-Tables: `jobs` (source data, status, notes, version, first/last seen), `settings` (schedule and statuses), `runs` (history and per-source statistics). This is the initial schema; a versioned migration system is required before changing deployed schemas. The worker currently repeats description enrichment on each collection; incremental per-job detail caching is a follow-up optimization. No push feed is available through these adapters.
+## Quick start
 
-## Backup
+1. **Download the project**
 
-The named PostgreSQL volume survives normal stop/start and `docker compose down`. **Do not use `docker compose down -v` unless you intend to delete the database.**
+   ```bash
+   git clone https://github.com/muhdarshad/job-scout.git
+   cd job-scout
+   ```
 
-Create a backup inside the container and copy it out (works without shell redirection encoding issues on Windows):
+2. **Create your environment file**
+
+   ```bash
+   # macOS/Linux
+   cp .env.example .env
+   # Windows PowerShell
+   Copy-Item .env.example .env
+   ```
+
+   Open `.env` and replace the example `POSTGRES_PASSWORD` with a long random alphanumeric password.
+
+3. **Build and start everything**
+
+   ```bash
+   docker compose up --build -d
+   ```
+
+   The first build takes a few minutes.
+
+4. **Open the app** at <http://localhost:8000>.
+
+The database starts empty. The worker runs its first scrape right away, which can take several minutes, and then runs again 30 minutes after each scrape finishes. New jobs appear on their own because the page refreshes automatically.
+
+Scraping only happens while your computer is awake and Docker is running.
+
+## Everyday commands
+
+| Task | Command |
+| --- | --- |
+| Follow scraper logs | `docker compose logs -f worker` |
+| Stop the app | `docker compose stop` |
+| Start it again | `docker compose start` |
+| Update to the latest version | `git pull` then `docker compose up --build -d` |
+
+Your data is stored in a Docker volume and survives stops, restarts, updates and `docker compose down`.
+
+> **Warning:** `docker compose down -v` deletes the database volume and all your jobs and notes.
+
+### Backup
 
 ```bash
 docker compose exec db pg_dump -U scout -d jobscout -Fc -f /tmp/jobscout.dump
 docker compose cp db:/tmp/jobscout.dump ./jobscout.dump
 ```
 
-## Development and tests
+Keep backups outside the repository (`*.dump` is already git-ignored).
 
-Python 3.12 and Node 22 are used by the Docker build.
+## Features
+
+- **Discover**: review new jobs. Filter by company, source (`CS` = company site, `LS` = LinkedIn/Indeed job board), German requirement and required experience. Search titles, companies, locations and notes.
+- **Applications board**: move jobs between Shortlisted, Applied and Interview by dragging them or from the details dialog. You can add and rename stages, and **Undo last assignment** reverses the last status change.
+- **Job details**: shows the original description, the requirements extracted from it, matched skills and a personalized 0–80 ranking. The ranking is a relevance score, not a probability.
+- **Bulk actions**: select jobs to assign a status, open their links, or **Export selected** to Excel. The export includes notes, statuses and full descriptions.
+- **Archive**: *Not interested* and *Not fit* jobs are collapsed into an archive. They are deleted automatically after 24 hours, and you can turn that off in Settings.
+- **Result alerts**: you can opt into a sound or desktop notification when a scrape finds new jobs. Alerts only work while the tab is open.
+- **Sources**: shows run history, live progress, per-source errors and pause/resume controls.
+
+## Configuration
+
+Most options are in the app's **Settings** screen:
+
+- turn individual company sources and LinkedIn/Indeed on or off, and edit search terms
+- set the skills used for extraction and ranking
+- set the scrape schedule and interval
+- customize the application statuses
+- set **Title exclusions**: plain keywords that hide unwanted jobs, which you can reveal again with *Show keyword-excluded jobs*
+- edit the **Built-in scraper filters**: the regular expressions for excluded titles, seniority levels, requirements and "likely interested" keywords. Each list can be reset to its defaults, which live in `scraper/job_rules.py`
+
+Settings take effect on the next scrape. Jobs that are already stored are not removed retroactively.
+
+The scrape country, posting window and result caps are in `scraper/config/sites.yaml` and `scraper/config/jobspy.yaml`, and the worker reads them on every run. The default posting window is one day. If the app has been offline for a long time, widen these windows for one catch-up run.
+
+## Development
+
+You need Python 3.12 and Node.js 22.
 
 ```bash
 python -m venv .venv
-# Activate .venv (Windows: .venv\Scripts\activate; macOS/Linux: source .venv/bin/activate)
-pip install -r requirements.txt
-pip install pytest httpx
+# Windows: .venv\Scripts\activate    macOS/Linux: source .venv/bin/activate
+pip install -r requirements.txt pytest httpx
 npm ci
-python -m pytest tests/test_app.py -q
-# Run scraper tests from their own root:
-cd scraper
-python -m pytest tests -q
 ```
 
-For a local UI preview without Docker, use SQLite and explicit sample data:
+**Run without Docker (demo mode).** This uses a local SQLite database (`preview.db`) filled with sample data. Scraping is disabled.
 
 ```bash
-# macOS/Linux:
+# macOS/Linux
 DEMO_MODE=1 uvicorn backend.api:app --port 8000
-# Windows PowerShell:
-# $env:DEMO_MODE='1'; uvicorn backend.api:app --port 8000
+# Windows PowerShell
+$env:DEMO_MODE='1'; uvicorn backend.api:app --port 8000
 ```
 
-In another terminal run `npm run dev`. Demo data only seeds an empty database; it never silently appears in the normal Docker database. Demo scraping is disabled. User edits persist in `preview.db`. The scheduled worker requires PostgreSQL and refuses SQLite.
+In a second terminal, run `npm run dev` and open the URL it prints (usually <http://localhost:5173>). The scheduled worker needs PostgreSQL, so use Docker for real scraping.
 
-## Validation and current limits
-
-- Frontend production build and API tests were run in the development workspace.
-- Browser visual verification was blocked by the workspace browser security policy. See `design-qa.md`; the UI is not claimed to be visually verified.
-- Docker is unavailable in that workspace; the complete Compose startup and PostgreSQL advisory-lock behavior must be verified on your computer.
-- Live portals were not scraped during development. Adapter behavior can change externally.
-- The API currently returns all retained jobs for client-side filtering. Add server-side pagination/indexed query columns when your database grows substantially.
-- Logos are small website favicons used for identification; they differ from the larger wordmarks in the concept image. See `public/logos/SOURCES.md`.
-
-## GitHub repository
-
-The project is hosted in the private [`muhdarshad/job-scout`](https://github.com/muhdarshad/job-scout) repository. The default branch is `main`.
-
-The `.gitignore` excludes `.env`, local databases, virtual environments, node_modules and build output. Keep PostgreSQL backups outside the repository.
-
-
-## Review filters, bulk actions and alerts
-
-- **Experience required** lists the actual extracted text as checkbox options, including numeric and qualitative requirements. No numeric bucketing is applied.
-- Check individual jobs or **Select all shown**, choose a status and press **Assign status** (maximum 1,000 per batch). A stale edit or missing record rolls back the whole batch. Notes are untouched. Changing search, filters or page clears selection. Archived jobs can be selected individually.
-- **Title exclusions** accepts one literal keyword/phrase per line, no regular expressions. Defaults cover postal delivery, parcel sorting, warehouse operatives, forklift/delivery drivers, cleaning, cashier and kitchen-helper roles in German and English. Matching ignores case, normalizes umlauts/hyphens and permits common plural/gender endings. These are starter rules; remove terms that are relevant to your search.
-- Existing keyword matches are hidden by default, not deleted; **Show keyword-excluded jobs** reveals them. Remove a keyword to restore visibility. New matching listings are filtered before the later description-enrichment pass; adapters that fetch detail metadata during listing still make those requests. Existing hard-coded scraper/ranker filters remain in effect.
-- **Likely interested** badges and **Likely interested only** use the same title-keyword rules as the existing Excel ranker. This is a keyword signal, not an assessment of qualification or a score threshold. Exclusion matches take precedence.
-- **Not fit** is added automatically to existing databases without resetting statuses, notes or schedules. **Not interested** and **Not fit** share the collapsed archive and can be restored through the job dialog.
-- Cards, overview rows, archive rows and details show one timestamp: **Posted** when an exact publication time exists, otherwise **Added** using the first database entry. A date-only posting falls back to database date and time. Scrape timestamps stay internal.
-- Open **Result alerts** to opt into a beep and/or desktop notification. Permission is requested only from your click. Click **Enable / test sound** after reopening a tab to satisfy browser autoplay requirements. Keep Job Scout open: this is browser polling, not background OS push delivery. New completed/partial runs alert only when they add jobs; old runs, repeated polls and zero-new-job results do not alert. Web Locks serializes claims between tabs where supported; browsers without it use best-effort localStorage deduplication. Browser/OS notification settings, Do Not Disturb and sleeping/background tabs can delay or suppress delivery.
-
-After merging, update your checkout and rebuild without deleting the PostgreSQL volume:
+**Tests** (GitHub Actions also runs these on every push):
 
 ```bash
-git pull origin main
-docker compose up --build -d
+python -m pytest tests/test_app.py -q
+cd scraper && python -m pytest tests -q && cd ..
+npm run test:unit
+npm run build
+npm run test:sites
 ```
 
-No destructive database migration is required: this release uses existing JSON data and settings tables. A running scrape uses the exclusions captured at its start; new settings apply on the next scrape.
+## Project layout
 
-Additional checks: `npm run test:unit` covers minimum-year buckets, archive categories and notification deduplication. Backend regressions cover bulk rollback, notes, existing-database upgrades, reversible title filtering and timestamp semantics. GitHub Actions runs those checks plus the scraper suite and frontend build.
+```
+backend/     FastAPI API, database models and scheduled worker
+src/         React frontend
+scraper/     Scraper platforms, JobSpy fork, requirement extractor and ranker
+scraper/config/  Source configuration (sites.yaml, jobspy.yaml)
+tests/       Backend and frontend tests
+```
 
-## Overview and checkbox filters
+## Notes and limitations
 
-Company, German requirement and experience-text filters support multiple checked values on both Discover and Applications. Empty selection means all; selected values match any option within a filter, and filters combine together. Clear filter resets one filter; Escape or clicking outside closes its menu. Assignment dropdowns still choose one status.
+- The app is reachable only from your own computer (`127.0.0.1`) and has no login. Do not expose it to a network or the internet without adding authentication and HTTPS.
+- Career portals change without notice, so individual scrapers can break. Check the **Sources** screen for per-source errors.
+- All jobs are loaded into the browser for filtering. A very large database may need server-side pagination.
+- Company logos are small website favicons. See `public/logos/SOURCES.md` for where they came from.
 
-Industry and extracted/matched skills appear as badges on overview rows, application cards and details. Missing source values are labeled as not stated; industries are not guessed from company names.
+## License
 
-Excel exports include the stored job description with line breaks and formula-safe text. Descriptions longer than Excel's 32,767-character cell limit continue in numbered columns. Invalid XML control characters are removed.
-
-## Selection exports and readable job details
-
-- **Export selected (N)** exports only checked jobs from Discover, Applications or individually checked archive rows. With no selection it is disabled. Changing filters or page clears selection. The API now requires POST /api/export with a nonempty list of job keys; the old all-jobs GET export is removed.
-- Filenames use the download time in your device timezone: jobscope_HHmm_ddMMyy.xlsx (for example jobscope_1345_271026.xlsx). API callers omitting the filename use Europe/Berlin time.
-- Job cards, overview rows, archive rows and details show a prominent date and time. An exact posting timestamp takes priority; date-only publications fall back to the first database entry timestamp. Refreshes never replace the first database-entry time.
-- **Experience required** is a dynamic checkbox filter using the extracted field text, including qualitative requirements. It no longer filters numeric minimum-year buckets.
-- **Show keyword-excluded jobs** reports saved counts and overrides the likely-interested restriction for excluded records. Search, company, German, experience and page/status restrictions still apply. Jobs skipped by collection were never stored and cannot be recovered by this switch.
-- Descriptions display paragraphs, headings and bullet lists. HTML is converted to text blocks; active markup is not rendered. Existing stored descriptions benefit immediately. Long flat text is split at sentence boundaries for readability.
-
-## Settings, undo and archive retention
-
-- **Undo last assignment** reverses the most recent status-changing action (single edit, drag/drop or bulk assignment) as one transaction. It survives reloads, keeps notes, and rejects undo if any affected job was edited afterward. There is one undo slot for this local workspace, not per browser tab. A new assignment replaces it; deletion invalidates it.
-- Applications cards show only title and company, plus the selection checkbox. Open the title for details. Discover rows retain their information with tighter spacing and wrapping.
-- **Open selected links** opens unique HTTP(S) posting links from checked jobs. Browsers may block multiple tabs; the result dialog provides individual links as a fallback. Jobs without valid URLs are skipped.
-- **Settings** contains company-source switches, LinkedIn/Indeed switches and search terms, skills for extraction/ranking, schedule controls, **Customize statuses**, and **Title exclusions**. Saved run preferences are captured at the next scrape. Known skill names retain the original matching patterns; custom skills use literal word matching. The scraper's former hard-coded title, seniority, requirement and job-type rules are editable under **Built-in scraper filters** (see below). Country, posting window and result caps stay in `sites.yaml` / `jobspy.yaml`.
-- LinkedIn previously stored dates but no repost status. The bundled scraper now captures explicit “Reposted” / “Erneut veröffentlicht” labels in listing metadata or the posting-time element. **Skip explicitly labeled LinkedIn reposts** drops only confirmed LinkedIn matches, not Indeed jobs or unknown cases. It cannot reliably detect unlabeled reposts and does not infer reposts from dates or description text. Existing unknown records are not retroactively removed. This detection has fixture coverage, not a guarantee of current live-page coverage.
-- Settings and Sources show real per-source progress, with stage counts for enrichment/search batches and indeterminate bars when the source provides no total. The UI polls every three seconds. Completion and failure history remains in Sources.
-- With **Delete Not interested / Not fit jobs after 24 hours** enabled (default), the worker deletes archived job records and notes on the first maintenance pass after 24 hours from assignment. Cleanup runs even with scheduling paused, but requires the worker to be running and waits for an active scrape to finish. Restoring/undoing before expiry cancels deletion. Existing archives get a fresh timer on upgrade. Disabling cleanup preserves records; re-enabling applies their existing timers.
-- Only a source-identity hash remains after deletion, preventing the same identity from reappearing on the next scrape. No job text or notes are retained in that marker. A genuinely different source ID is a new job. Undo cannot recover deleted records.
-
-Upgrade creates archive-clock and suppression-marker tables and seeds preferences/undo settings automatically. It does not delete existing jobs during startup. Do not remove your PostgreSQL volume when updating.
-
-## Grouped filters, source filter and built-in scraper filters
-
-- **Landing page** is Discover.
-- **Source** filters Discover and Applications to company portals (`CS`, e.g. Airbus) or job boards (`LS`, LinkedIn/Indeed). Each job also shows its full source (for example `CS / Airbus`).
-- **German requirement** and **Experience required** group the extracted text into a few bins instead of listing every raw value. Experience: Not stated, Optional / qualitative only, Up to 1 year, 2, 3, 4 and 5+ years (from the extracted minimum). German: Not stated, Not required, Preferred only, Level unspecified, Basic (A1–A2), Intermediate (B1–B2 / good) and Advanced (C1+ / fluent). Options and counts come only from the jobs on the current page: unassigned (New) jobs on Discover, board stages on Applications.
-- **Show keyword-excluded jobs** counts and reveals excluded jobs on the current page. It is disabled when the page has none. Excluded jobs that are still "New" appear on Discover, not Applications.
-- **Built-in scraper filters** (Settings) edit the lists that used to live in code: excluded titles, excluded seniority/level, not-interested title keywords, likely-interested keywords and excluded description requirements, plus "full-time only". Entries are case-insensitive regular expressions, validated on save. Each list has **Reset to defaults**; only lists you change are stored, so untouched lists follow future default updates. Changes apply to the next scrape; the Likely interested badge updates immediately. Stored jobs are not removed retroactively. Defaults live in `scraper/job_rules.py`.
+[MIT](LICENSE). The bundled JobSpy fork is under its own license in `scraper/vendor/JobSpy/LICENSE`.
