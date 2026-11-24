@@ -4,6 +4,20 @@ A local-first job discovery and application tracker. Job Scout regularly scrapes
 
 It runs as a React frontend, a FastAPI backend, a PostgreSQL database and a scheduled Python scraping worker, all started together with Docker Compose.
 
+## Screenshots
+
+**Discover**: new jobs, ranked and filterable, with extracted requirements and skills.
+
+![Discover view](docs/screenshots/discover.png)
+
+**Applications**: a board for tracking application stages, including custom stages.
+
+![Applications board](docs/screenshots/applications.png)
+
+**Settings**: search terms, skills, tracking options and the editable scraper filters.
+
+![Settings](docs/screenshots/settings.png)
+
 ## Tech stack
 
 | Layer | Tools |
